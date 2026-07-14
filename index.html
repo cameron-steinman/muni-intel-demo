@@ -59,7 +59,6 @@ input.filter-input::placeholder { color:#475569; }
   /* Profile panel: full-width on mobile */
   #profilePanel { width: 100% !important; max-width: 100% !important; height: 85vh !important; top: auto !important; bottom: 0 !important; transform: translateY(100%) !important; border-radius: 16px 16px 0 0; }
   #profilePanel.open { transform: translateY(0) !important; }
-  .profile-backdrop { display: block; }
   /* Touch-friendly tap targets */
   .nav-link { padding: 10px 10px !important; font-size: 13px !important; min-height: 44px; display: inline-flex; align-items: center; }
   button { min-height: 44px; min-width: 44px; }
@@ -82,6 +81,7 @@ input.filter-input::placeholder { color:#475569; }
     </div>
     <nav style="display:flex;align-items:stretch;gap:0;">
       <span class="nav-link active" onclick="switchTab('map')" id="tab-map">&#128506; Map</span>
+      <span class="nav-link" onclick="switchTab('leaderboards')" id="tab-leaderboards">&#127942; Rankings</span>
       <span class="nav-link" onclick="switchTab('projects')" id="tab-projects">&#128203; Projects</span>
       <span class="nav-link" onclick="switchTab('developers')" id="tab-developers">&#127959; Developers</span>
       <span class="nav-link" onclick="switchTab('municipalities')" id="tab-municipalities">&#127963; Municipalities</span>
@@ -243,6 +243,16 @@ input.filter-input::placeholder { color:#475569; }
           </thead>
           <tbody id="docsBody"></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- LEADERBOARDS VIEW -->
+    <div id="view-leaderboards" style="flex:1;display:none;overflow:auto;padding:20px;background:#f8fafc;">
+      <div style="max-width:920px;margin:0 auto;">
+        <h2 style="font-size:18px;font-weight:800;color:#0f172a;margin:0 0 4px;">&#127942; Rankings &amp; Leaderboards</h2>
+        <div style="font-size:13px;color:#64748b;margin-bottom:16px;">Every row is a door &mdash; click any entity to open its full profile.</div>
+        <div id="lbCats" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;"></div>
+        <div id="lbContent"></div>
       </div>
     </div>
 
@@ -723,6 +733,43 @@ PROJECTS.forEach(p => {
 });
 const MUNIS = Object.values(MUNI_MAP).sort((a,b) => b.totalMW - a.totalMW);
 
+// Technology profiles keyed by normalized _tech (F6)
+const TECH_MAP = {};
+PROJECTS.forEach(p => {
+  const k = p._tech || 'Other';
+  if (!TECH_MAP[k]) TECH_MAP[k] = {name:k, projects:[], totalMW:0, devs:new Set(), munis:new Set(), oppCounts:{Low:0,Moderate:0,High:0,'Very High':0,Unknown:0}, issueCnt:{}};
+  const t = TECH_MAP[k];
+  t.projects.push(p);
+  t.totalMW += p._mw;
+  if (p.developer) t.devs.add(p.developer);
+  if (p.municipality) t.munis.add(p.municipality);
+  t.oppCounts[p._opp]++;
+});
+const TECHS = Object.values(TECH_MAP).sort((a,b) => b.totalMW - a.totalMW);
+
+// Key-issue tag index (F4) — split on ; , or newline; dedupe per project
+function parseIssues(raw) {
+  if (!raw) return [];
+  return raw.split(/[;,\n]+/).map(s => s.trim()).filter(Boolean);
+}
+const ISSUE_MAP = {};
+PROJECTS.forEach(p => {
+  const seen = new Set();
+  parseIssues(p.key_issues).forEach(ki => {
+    const key = ki.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (!ISSUE_MAP[key]) ISSUE_MAP[key] = { label: ki, key: key, projects: [], totalMW: 0, devs: new Set(), munis: new Set(), oppCounts: {Low:0,Moderate:0,High:0,'Very High':0,Unknown:0} };
+    const e = ISSUE_MAP[key];
+    e.projects.push(p);
+    e.totalMW += p._mw;
+    if (p.developer) e.devs.add(p.developer);
+    if (p.municipality) e.munis.add(p.municipality);
+    e.oppCounts[p._opp]++;
+  });
+});
+const ISSUES = Object.values(ISSUE_MAP).sort((a,b) => b.projects.length - a.projects.length);
+
 const ALL_DOCS = [];
 PROJECTS.forEach(p => p._docs.forEach(fn => ALL_DOCS.push({filename:fn, project:p})));
 
@@ -855,7 +902,7 @@ function clearFilters() {
 // ================================================================
 function switchTab(tab) {
   currentTab = tab;
-  ['map','projects','developers','municipalities','documents'].forEach(t => {
+  ['map','leaderboards','projects','developers','municipalities','documents'].forEach(t => {
     const v = document.getElementById('view-' + t);
     const n = document.getElementById('tab-' + t);
     const isActive = t === tab;
@@ -872,6 +919,7 @@ function renderTab() {
   else if (currentTab === 'developers') renderDevs();
   else if (currentTab === 'municipalities') renderMunis();
   else if (currentTab === 'documents') renderDocs();
+  else if (currentTab === 'leaderboards') renderLeaderboards();
 }
 
 // ================================================================
@@ -879,7 +927,7 @@ function renderTab() {
 // ================================================================
 function techBadge(tech) {
   const c = TECH_COLORS[tech] || '#6b7280';
-  return '<span class="badge" style="background:' + c + '20;color:' + c + ';border:1px solid ' + c + '40;">' + tech + '</span>';
+  return '<span onclick="event.stopPropagation();openTech(\'' + esc(tech).replace(/'/g,"\\'") + '\')" class="badge" style="background:' + c + '20;color:' + c + ';border:1px solid ' + c + '40;cursor:pointer;" title="View ' + esc(tech) + ' profile">' + tech + '</span>';
 }
 function oppBadge(opp) {
   const c = OPP[opp] || OPP['Unknown'];
@@ -923,8 +971,8 @@ function renderProjects() {
   document.getElementById('projectsBody').innerHTML = slice.map(p =>
     '<tr class="project-row" onclick="openProject(' + p.id + ')" style="border-bottom:1px solid #f1f5f9;">' +
     '<td style="padding:9px 14px;font-size:15px;font-weight:500;color:#0f172a;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.project_name||'—') + '</td>' +
-    '<td style="padding:9px 14px;font-size:15px;color:#475569;white-space:nowrap;">' + esc(p.municipality||'—') + '</td>' +
-    '<td style="padding:9px 14px;font-size:15px;color:#475569;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.developer||'—') + '</td>' +
+    '<td style="padding:9px 14px;font-size:15px;color:#475569;white-space:nowrap;">' + (p.municipality ? '<span onclick="event.stopPropagation();openMuni(\'' + esc(p.municipality).replace(/'/g,"\\'") + '\')" style="color:#2563eb;cursor:pointer;">' + esc(p.municipality) + '</span>' : '—') + '</td>' +
+    '<td style="padding:9px 14px;font-size:15px;color:#475569;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (p.developer ? '<span onclick="event.stopPropagation();openDev(\'' + esc(p.developer).replace(/'/g,"\\'") + '\')" style="color:#2563eb;cursor:pointer;">' + esc(p.developer) + '</span>' : '—') + '</td>' +
     '<td style="padding:9px 14px;">' + techBadge(p._tech) + '</td>' +
     '<td style="padding:9px 14px;text-align:right;font-size:15px;font-weight:600;color:#0f172a;">' + (p._mw > 0 ? p._mw.toFixed(1) : '—') + '</td>' +
     '<td style="padding:9px 14px;">' + statusBadge(p.status) + '</td>' +
@@ -950,10 +998,10 @@ function renderDevs() {
   document.getElementById('devsGrid').innerHTML = list.slice(0, 200).map(d => {
     const top = Object.entries(d.techs).sort((a,b) => b[1]-a[1])[0];
     const tc = top ? (TECH_COLORS[top[0]]||'#6b7280') : '#6b7280';
-    return '<div class="card-hover" onclick="openDev(\'' + esc(d.name).replace(/'/g,"&#39;") + '\')" style="background:white;border-radius:12px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f1f5f9;">' +
+    return '<div class="card-hover" onclick="openDev(\'' + esc(d.name).replace(/'/g,"\\'") + '\')" style="background:white;border-radius:12px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f1f5f9;">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">' +
       '<div style="font-size:15px;font-weight:700;color:#0f172a;line-height:1.3;flex:1;padding-right:8px;">' + esc(d.name) + '</div>' +
-      (top ? '<span style="background:' + tc + '15;color:' + tc + ';font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;">' + top[0] + '</span>' : '') +
+      (top ? '<span onclick="event.stopPropagation();openTech(\'' + esc(top[0]).replace(/'/g,"\\'") + '\')" style="background:' + tc + '15;color:' + tc + ';font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;cursor:pointer;">' + top[0] + '</span>' : '') +
       '</div>' +
       '<div style="display:flex;gap:14px;">' +
       '<div><div style="font-size:19px;font-weight:800;color:#0f172a;">' + fmtN(d.projects.length) + '</div><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Projects</div></div>' +
@@ -976,10 +1024,10 @@ function renderMunis() {
     const highOpp = m.oppCounts.High + m.oppCounts['Very High'];
     const oppPct = m.projects.length > 0 ? Math.round(highOpp / m.projects.length * 100) : 0;
     const barColor = oppPct > 50 ? '#ef4444' : oppPct > 25 ? '#f97316' : '#22c55e';
-    return '<div class="card-hover" onclick="openMuni(\'' + esc(m.name).replace(/'/g,"&#39;") + '\')" style="background:white;border-radius:12px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f1f5f9;">' +
+    return '<div class="card-hover" onclick="openMuni(\'' + esc(m.name).replace(/'/g,"\\'") + '\')" style="background:white;border-radius:12px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f1f5f9;">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">' +
       '<div style="font-size:15px;font-weight:700;color:#0f172a;line-height:1.3;flex:1;padding-right:8px;">' + esc(m.name) + '</div>' +
-      (top ? '<span style="background:' + tc + '15;color:' + tc + ';font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;">' + top[0] + '</span>' : '') +
+      (top ? '<span onclick="event.stopPropagation();openTech(\'' + esc(top[0]).replace(/'/g,"\\'") + '\')" style="background:' + tc + '15;color:' + tc + ';font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;cursor:pointer;">' + top[0] + '</span>' : '') +
       '</div>' +
       '<div style="display:flex;gap:14px;margin-bottom:10px;">' +
       '<div><div style="font-size:19px;font-weight:800;color:#0f172a;">' + fmtN(m.projects.length) + '</div><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Projects</div></div>' +
@@ -1104,6 +1152,7 @@ function initMap() {
     .then(data => {
       // Build CSD metadata lookup keyed by CSDNAME
       window.CSD_META = {};
+      window.CSD_GEOJSON = data; // stash for opposition choropleth (F5)
       data.features.forEach(function(f) {
         const p = f.properties;
         if (p.CSDNAME) {
@@ -1185,6 +1234,16 @@ function initMap() {
         return div;
       };
       cdBtn.addTo(mapInst);
+
+      // Opposition Heat choropleth toggle button (F5)
+      const heatBtn = L.control({position: 'topright'});
+      heatBtn.onAdd = function() {
+        const div = L.DomUtil.create('div', '');
+        div.innerHTML = '<button id="choroToggle" onclick="toggleChoropleth()" style="background:white;border:1px solid #ef4444;border-radius:7px;padding:5px 10px;font-size:12px;font-weight:700;color:#b91c1c;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.12);display:block;margin-top:4px;">&#128293; Opposition Heat</button>';
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      };
+      heatBtn.addTo(mapInst);
     })
     .catch(function(err) { console.warn('Boundary GeoJSON load failed:', err); });
 
@@ -1201,9 +1260,9 @@ function initMap() {
     m.bindPopup(
       '<div style="min-width:210px;font-family:-apple-system,sans-serif;">' +
       '<div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:4px;line-height:1.3;">' + esc(p.project_name||'—') + '</div>' +
-      '<div style="font-size:13px;color:#64748b;margin-bottom:8px;">' + esc(p.municipality||'—') + ' · ' + esc(p.developer||'—') + '</div>' +
+      '<div style="font-size:13px;color:#64748b;margin-bottom:8px;">' + (p.municipality ? '<span onclick="openMuni(\'' + esc(p.municipality).replace(/'/g,"\\'") + '\')" style="color:#2563eb;cursor:pointer;text-decoration:underline;">' + esc(p.municipality) + '</span>' : '—') + ' · ' + (p.developer ? '<span onclick="openDev(\'' + esc(p.developer).replace(/'/g,"\\'") + '\')" style="color:#2563eb;cursor:pointer;text-decoration:underline;">' + esc(p.developer) + '</span>' : '—') + '</div>' +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">' +
-      '<span style="background:' + color + '20;color:' + color + ';font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">' + p._tech + '</span>' +
+      '<span onclick="openTech(\'' + esc(p._tech).replace(/'/g,"\\'") + '\')" style="background:' + color + '20;color:' + color + ';font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;cursor:pointer;">' + p._tech + '</span>' +
       (p._mw > 0 ? '<span style="background:#dbeafe;color:#1e3a8a;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">' + p._mw.toFixed(1) + ' MW</span>' : '') +
       '<span style="background:' + oppC.bg + ';color:' + oppC.text + ';font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">' + p._opp + '</span>' +
       '</div>' +
@@ -1218,11 +1277,200 @@ function initMap() {
   });
 }
 
+// ================================================================
+// OPPOSITION HEAT CHOROPLETH (F5)
+// ================================================================
+let choroLayer = null;
+let choroVisible = false;
+let choroLegend = null;
+let choroFilter = null;      // active opposition-level filter (or null)
+const OPP_SEVERITY = ['Very High','High','Moderate','Low']; // most→least severe
+const OPP_LEVELS = ['Low','Moderate','High','Very High','Unknown'];
+
+// Best-effort name normalization for the polygon↔municipality join
+function normName(s) {
+  if (!s) return '';
+  return s.toLowerCase()
+    .replace(/^(the )?(township|town|city|municipality|village|county|corporation|municipal corporation)\s+of\s+/i, '')
+    .replace(/\b(township|town|city|municipality|village|county)\b/g, '')
+    .replace(/[‐-―−]/g, '-')
+    .replace(/[.,\/'"()]/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+// Aggregate every municipality's projects onto its CSD polygon.
+function buildCsdAgg() {
+  if (window.CSD_AGG) return window.CSD_AGG;
+  const feats = (window.CSD_GEOJSON && window.CSD_GEOJSON.features) || [];
+  const csdNames = feats.map(f => f.properties.CSDNAME).filter(Boolean);
+  const csdByNorm = {};
+  csdNames.forEach(c => { const k = normName(c); if (!csdByNorm[k]) csdByNorm[k] = c; });
+
+  // demo muni name → CSDNAME (name_map override first, then normalized fallback)
+  const csdToMunis = {};
+  let matched = 0, total = 0;
+  Object.keys(MUNI_MAP).forEach(mn => {
+    if (mn === 'Unknown') return;
+    total++;
+    let csd = DEMO_TO_GIS[mn];
+    if (!csd) { const k = normName(mn); if (csdByNorm[k]) csd = csdByNorm[k]; }
+    if (!csd) return;
+    matched++;
+    (csdToMunis[csd] = csdToMunis[csd] || []).push(mn);
+  });
+
+  const agg = {};
+  Object.entries(csdToMunis).forEach(([csd, munis]) => {
+    const e = { csd: csd, munis: munis, primary: munis[0], projects: 0, totalMW: 0,
+                oppCounts: {Low:0,Moderate:0,High:0,'Very High':0,Unknown:0} };
+    munis.forEach(mn => {
+      const m = MUNI_MAP[mn];
+      e.projects += m.projects.length;
+      e.totalMW += m.totalMW;
+      OPP_LEVELS.forEach(l => { e.oppCounts[l] += (m.oppCounts[l] || 0); });
+    });
+    // Dominant level = most common among the 4 real levels, tie→more severe
+    let best = null, bestCnt = -1;
+    OPP_SEVERITY.slice().reverse().forEach(l => { // Low..Very High so severe wins ties
+      if (e.oppCounts[l] > bestCnt) { bestCnt = e.oppCounts[l]; best = l; }
+    });
+    e.dominant = bestCnt > 0 ? best : 'Unknown';
+    agg[csd] = e;
+  });
+  window.CSD_AGG = agg;
+  window.CSD_MATCH_RATE = { matched: matched, total: total, polygons: Object.keys(agg).length };
+  console.log('[F5] choropleth join: ' + matched + '/' + total + ' municipalities matched, ' +
+    Object.keys(agg).length + '/' + csdNames.length + ' polygons colored');
+  return agg;
+}
+
+function choroStyle(feature) {
+  const csd = feature.properties.CSDNAME;
+  const e = window.CSD_AGG && window.CSD_AGG[csd];
+  if (!e) { // unmatched polygon → neutral gray, never mislabeled
+    return { fillColor: '#cbd5e1', fillOpacity: 0.10, color: '#94a3b8', weight: 0.4, opacity: 0.3 };
+  }
+  const dimmed = choroFilter && e.dominant !== choroFilter;
+  const c = OPP[e.dominant] || OPP['Unknown'];
+  return {
+    fillColor: c.bar,
+    fillOpacity: dimmed ? 0.05 : 0.62,
+    color: dimmed ? '#cbd5e1' : c.bar,
+    weight: dimmed ? 0.4 : 1,
+    opacity: dimmed ? 0.25 : 0.85
+  };
+}
+
+function oppMixHtml(oppCounts) {
+  return OPP_LEVELS.filter(l => oppCounts[l] > 0).map(l => {
+    const c = OPP[l];
+    return '<span style="background:' + c.bg + ';color:' + c.text + ';font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;">' + l + ' ' + oppCounts[l] + '</span>';
+  }).join(' ');
+}
+
+function buildChoroLayer() {
+  buildCsdAgg();
+  choroLayer = L.geoJSON(window.CSD_GEOJSON, {
+    style: choroStyle,
+    onEachFeature: function(feature, layer) {
+      const csd = feature.properties.CSDNAME;
+      const e = window.CSD_AGG && window.CSD_AGG[csd];
+      if (!e) {
+        layer.bindTooltip('<div style="font-weight:700;font-size:13px;">' + esc(csd || '') + '</div>' +
+          '<div style="font-size:11px;color:#94a3b8;">No project data</div>', {sticky: true, opacity: 0.95});
+        return;
+      }
+      const c = OPP[e.dominant] || OPP['Unknown'];
+      const nameLine = e.munis.length > 1 ? esc(e.munis[0]) + ' <span style="color:#94a3b8;">+' + (e.munis.length-1) + '</span>' : esc(e.munis[0]);
+      layer.bindTooltip(
+        '<div style="font-weight:700;font-size:13px;">' + nameLine + '</div>' +
+        '<div style="font-size:11px;color:#64748b;margin-bottom:4px;">' + e.projects + ' projects · ' + Math.round(e.totalMW) + ' MW · ' +
+        '<span style="color:' + c.text + ';font-weight:700;">' + e.dominant + '</span></div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:3px;max-width:230px;">' + oppMixHtml(e.oppCounts) + '</div>',
+        {sticky: true, opacity: 0.97}
+      );
+      layer.on('mouseover', function() { layer.setStyle({weight: 2.5, fillOpacity: 0.78}); layer.bringToFront(); });
+      layer.on('mouseout', function() { choroLayer.resetStyle(layer); });
+      layer.on('click', function(ev) { L.DomEvent.stopPropagation(ev); openMuni(e.primary); });
+    }
+  });
+}
+
+function restyleChoro() {
+  if (choroLayer) choroLayer.setStyle(choroStyle);
+  renderChoroLegend();
+}
+
+function filterChoroplethLevel(level) {
+  choroFilter = (choroFilter === level) ? null : level;
+  restyleChoro();
+}
+
+function renderChoroLegend() {
+  const body = document.getElementById('choroLegendBody');
+  if (!body) return;
+  const agg = window.CSD_AGG || {};
+  const counts = {Low:0,Moderate:0,High:0,'Very High':0,Unknown:0};
+  Object.values(agg).forEach(e => { counts[e.dominant] = (counts[e.dominant]||0) + 1; });
+  const mr = window.CSD_MATCH_RATE || {};
+  body.innerHTML = OPP_LEVELS.map(l => {
+    const c = OPP[l];
+    const active = choroFilter === l;
+    const faded = choroFilter && !active;
+    return '<div onclick="filterChoroplethLevel(\'' + l.replace(/'/g,"\\'") + '\')" ' +
+      'style="display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:6px;cursor:pointer;opacity:' + (faded?0.4:1) + ';background:' + (active?'#f1f5f9':'transparent') + ';" ' +
+      'onmouseover="this.style.background=\'#f1f5f9\'" onmouseout="this.style.background=\'' + (active?'#f1f5f9':'transparent') + '\'">' +
+      '<span style="width:14px;height:14px;border-radius:4px;background:' + c.bar + ';flex-shrink:0;border:1px solid rgba(0,0,0,0.1);"></span>' +
+      '<span style="font-size:12px;font-weight:600;color:#334155;flex:1;">' + l + '</span>' +
+      '<span style="font-size:11px;color:#94a3b8;">' + (counts[l]||0) + '</span>' +
+      '</div>';
+  }).join('') +
+    '<div style="display:flex;align-items:center;gap:7px;padding:3px 6px;margin-top:2px;border-top:1px solid #f1f5f9;">' +
+    '<span style="width:14px;height:14px;border-radius:4px;background:#cbd5e1;flex-shrink:0;"></span>' +
+    '<span style="font-size:11px;color:#94a3b8;flex:1;">No data / unmatched</span></div>' +
+    (mr.matched ? '<div style="font-size:10px;color:#94a3b8;margin-top:5px;padding:0 6px;">' + mr.matched + '/' + mr.total + ' munis joined · ' + mr.polygons + ' shaded</div>' : '') +
+    (choroFilter ? '<div onclick="filterChoroplethLevel(\'' + choroFilter.replace(/'/g,"\\'") + '\')" style="font-size:11px;color:#2563eb;cursor:pointer;text-align:center;margin-top:4px;font-weight:600;">Clear filter</div>' : '');
+}
+
+function toggleChoropleth() {
+  if (!mapInst || !window.CSD_GEOJSON) return;
+  if (!choroLayer) buildChoroLayer();
+  choroVisible = !choroVisible;
+  const btn = document.getElementById('choroToggle');
+  if (choroVisible) {
+    // Hide plain boundary layer while heat is active so colors read clean
+    if (boundaryLayer && mapInst.hasLayer(boundaryLayer)) mapInst.removeLayer(boundaryLayer);
+    choroLayer.addTo(mapInst);
+    choroFilter = null;
+    if (!choroLegend) {
+      choroLegend = L.control({position: 'bottomleft'});
+      choroLegend.onAdd = function() {
+        const div = L.DomUtil.create('div', '');
+        div.innerHTML = '<div style="background:white;border-radius:9px;padding:8px 8px 6px;box-shadow:0 2px 10px rgba(0,0,0,0.18);min-width:150px;">' +
+          '<div style="font-size:11px;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.05em;margin:0 6px 5px;">&#128293; Dominant Opposition</div>' +
+          '<div id="choroLegendBody"></div></div>';
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      };
+      choroLegend.addTo(mapInst);
+    } else {
+      choroLegend.addTo(mapInst);
+    }
+    renderChoroLegend();
+    if (btn) { btn.innerHTML = '&#128293; Opposition Heat ON'; btn.style.background = '#fef2f2'; }
+  } else {
+    if (choroLayer && mapInst.hasLayer(choroLayer)) mapInst.removeLayer(choroLayer);
+    if (choroLegend) mapInst.removeControl(choroLegend);
+    if (boundaryVisible && boundaryLayer) boundaryLayer.addTo(mapInst);
+    if (btn) { btn.innerHTML = '&#128293; Opposition Heat'; btn.style.background = 'white'; }
+  }
+}
+
 function updateMarkers() {
   const visIds = new Set(filtered.map(p => p.id));
   markers.forEach(m => {
-    if (visIds.has(m._pid)) { m.setOpacity(1); m.setStyle({fillOpacity:0.82}); }
-    else { m.setOpacity(0.07); m.setStyle({fillOpacity:0.04}); }
+    if (visIds.has(m._pid)) { m.setStyle({opacity:1, fillOpacity:0.82}); }
+    else { m.setStyle({opacity:0.07, fillOpacity:0.04}); }
   });
 }
 
@@ -1301,7 +1549,7 @@ function openProject(id) {
   const oppC = OPP[p._opp] || OPP['Unknown'];
   const tc = TECH_COLORS[p._tech] || '#6b7280';
   const sc = STATUS_C[p.status] || STATUS_C[''];
-  const issues = p.key_issues ? p.key_issues.split(',').map(k => k.trim()).filter(Boolean) : [];
+  const issues = parseIssues(p.key_issues);
   const dev = DEV_MAP[p.developer];
   const muni = MUNI_MAP[p.municipality];
 
@@ -1311,7 +1559,7 @@ function openProject(id) {
     '<button onclick="closePanel()" style="background:#334155;color:#94a3b8;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-size:14px;white-space:nowrap;">&#x2715; Close</button>' +
     '</div>' +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
-    '<span style="background:' + tc + '30;color:' + (tc === '#eab308' ? '#ca8a04' : tc) + ';border:1px solid ' + tc + '50;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;">' + p._tech + '</span>' +
+    '<span onclick="openTech(\'' + esc(p._tech).replace(/'/g,"\\'") + '\')" style="background:' + tc + '30;color:' + (tc === '#eab308' ? '#ca8a04' : tc) + ';border:1px solid ' + tc + '50;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;cursor:pointer;">' + p._tech + '</span>' +
     (p._mw > 0 ? '<span style="background:#1d4ed8;color:#93c5fd;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;">' + p._mw.toFixed(1) + ' MW</span>' : '') +
     '<span style="background:' + sc.bg + ';color:' + sc.text + ';font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;">' + (p.status||'N/A').replace(/_/g,' ') + '</span>' +
     '<span style="background:' + oppC.bg + ';color:' + oppC.text + ';font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;">' + p._opp + ' Opp</span>' +
@@ -1340,7 +1588,7 @@ function openProject(id) {
     html += '<div style="margin-bottom:16px;">' +
       '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Key Issues</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
-      issues.map(ki => '<span style="background:#fef3c7;color:#92400e;font-size:13px;padding:2px 9px;border-radius:20px;">' + esc(ki) + '</span>').join('') +
+      issues.map(ki => issueTag(ki)).join('') +
       '</div></div>';
   }
 
@@ -1361,7 +1609,7 @@ function openProject(id) {
     '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Related Entities</div>';
 
   if (p.developer) {
-    html += '<div onclick="openDev(\'' + esc(p.developer).replace(/'/g,"&#39;") + '\')" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onmouseover="this.style.background=\'#f0f9ff\'" onmouseout="this.style.background=\'#f8fafc\'">' +
+    html += '<div onclick="openDev(\'' + esc(p.developer).replace(/'/g,"\\'") + '\')" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onmouseover="this.style.background=\'#f0f9ff\'" onmouseout="this.style.background=\'#f8fafc\'">' +
       '<div><div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Developer</div>' +
       '<div style="font-size:15px;font-weight:600;color:#0f172a;">' + esc(p.developer) + '</div>' +
       (dev ? '<div style="font-size:13px;color:#64748b;">' + fmtN(dev.projects.length) + ' projects · ' + Math.round(dev.totalMW) + ' MW</div>' : '') +
@@ -1369,7 +1617,7 @@ function openProject(id) {
   }
 
   if (p.municipality) {
-    html += '<div onclick="openMuni(\'' + esc(p.municipality).replace(/'/g,"&#39;") + '\')" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onmouseover="this.style.background=\'#f0f9ff\'" onmouseout="this.style.background=\'#f8fafc\'">' +
+    html += '<div onclick="openMuni(\'' + esc(p.municipality).replace(/'/g,"\\'") + '\')" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onmouseover="this.style.background=\'#f0f9ff\'" onmouseout="this.style.background=\'#f8fafc\'">' +
       '<div><div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Municipality</div>' +
       '<div style="font-size:15px;font-weight:600;color:#0f172a;">' + esc(p.municipality) + '</div>' +
       (muni ? '<div style="font-size:13px;color:#64748b;">' + fmtN(muni.projects.length) + ' projects · ' + Math.round(muni.totalMW) + ' MW</div>' : '') +
@@ -1388,8 +1636,69 @@ function openProject(id) {
       }).join('') + '</div>';
   }
 
+  // ---- F8: Related Projects rails ----
+  html += relatedRailsHtml(p);
+
   html += '</div></div></div>';
   openPanel(html);
+}
+
+// Related Projects rails (F8) — client-side filter, mini cards, recenter on click
+function recenterMap(muniName) {
+  if (!mapInst || !muniName) return;
+  const c = getMuniCoords(muniName);
+  if (c) mapInst.panTo(c, {animate: true});
+}
+function openRelated(id) {
+  const p = PROJECTS.find(x => x.id === id);
+  openProject(id);
+  if (p) recenterMap(p.municipality);
+}
+function relatedCard(p) {
+  const tc = TECH_COLORS[p._tech] || '#6b7280';
+  return '<div onclick="openRelated(' + p.id + ')" class="card-hover" style="flex:0 0 auto;width:200px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;cursor:pointer;">' +
+    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">' +
+    '<span style="width:9px;height:9px;border-radius:50%;background:' + tc + ';flex-shrink:0;"></span>' +
+    '<span style="font-size:12px;font-weight:700;color:' + tc + ';">' + esc(p._tech) + '</span>' +
+    '<span style="font-size:12px;color:#94a3b8;margin-left:auto;">' + (p._mw > 0 ? p._mw.toFixed(1) + ' MW' : '—') + '</span>' +
+    '</div>' +
+    '<div style="font-size:13px;font-weight:600;color:#0f172a;line-height:1.3;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:34px;">' + esc(p.project_name || '—') + '</div>' +
+    '<div style="font-size:11px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.municipality || '—') + '</div>' +
+    '</div>';
+}
+function relatedRail(title, projects, seeAllOnclick, total) {
+  if (!projects.length) return '';
+  const cards = projects.slice(0, 5).map(relatedCard).join('');
+  const seeAll = (total > projects.slice(0,5).length && seeAllOnclick)
+    ? '<span onclick="' + seeAllOnclick + '" style="flex:0 0 auto;align-self:center;font-size:12px;font-weight:700;color:#2563eb;cursor:pointer;padding:0 10px;white-space:nowrap;">See all ' + total + ' &rarr;</span>'
+    : '';
+  return '<div style="margin-bottom:14px;">' +
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">' + title + '</div>' +
+    '<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;">' + cards + seeAll + '</div>' +
+    '</div>';
+}
+function relatedRailsHtml(p) {
+  let html = '<div style="border-top:1px solid #f1f5f9;padding-top:16px;margin-top:16px;">' +
+    '<div style="font-size:13px;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;">&#128279; Related Projects</div>';
+  let any = false;
+
+  if (p.developer && DEV_MAP[p.developer]) {
+    const d = DEV_MAP[p.developer];
+    const rel = d.projects.filter(x => x.id !== p.id);
+    if (rel.length) { any = true; html += relatedRail('More by ' + esc(p.developer), rel, "openDev('" + esc(p.developer).replace(/'/g,"\\'") + "')", rel.length); }
+  }
+  if (p.municipality && MUNI_MAP[p.municipality]) {
+    const m = MUNI_MAP[p.municipality];
+    const rel = m.projects.filter(x => x.id !== p.id);
+    if (rel.length) { any = true; html += relatedRail('More in ' + esc(p.municipality), rel, "openMuni('" + esc(p.municipality).replace(/'/g,"\\'") + "')", rel.length); }
+  }
+  if (p._tech && TECH_MAP[p._tech]) {
+    const t = TECH_MAP[p._tech];
+    const rel = t.projects.filter(x => x.id !== p.id).sort((a,b) => b._mw - a._mw);
+    if (rel.length) { any = true; html += relatedRail('More ' + esc(p._tech), rel, "openTech('" + esc(p._tech).replace(/'/g,"\\'") + "')", rel.length); }
+  }
+  html += '</div>';
+  return any ? html : '';
 }
 
 // ================================================================
@@ -1401,6 +1710,15 @@ function openDev(name) {
   const techEntries = Object.entries(d.techs).sort((a,b) => b[1]-a[1]);
   const maxT = techEntries[0] ? techEntries[0][1] : 1;
   const avgMW = d.projects.length > 0 ? (d.totalMW / d.projects.length).toFixed(1) : '—';
+  const dOpp = {Low:0,Moderate:0,High:0,'Very High':0,Unknown:0};
+  const dIssueCnt = {};
+  d.projects.forEach(p => {
+    dOpp[p._opp]++;
+    parseIssues(p.key_issues).forEach(ki => { dIssueCnt[ki] = (dIssueCnt[ki]||0)+1; });
+  });
+  const dHighOpp = dOpp.High + dOpp['Very High'];
+  const dOppPct = d.projects.length ? Math.round(dHighOpp / d.projects.length * 100) : 0;
+  const dTopIssues = Object.entries(dIssueCnt).sort((a,b) => b[1]-a[1]).slice(0, 15);
 
   let html = '<div class="profile-sticky-header" style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:20px 20px 16px;position:sticky;top:0;z-index:10;">' +
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">' +
@@ -1416,8 +1734,31 @@ function openDev(name) {
     '<div class="profile-metric"><div class="val">' + fmtN(d.projects.length) + '</div><div class="lbl">Projects</div></div>' +
     '<div class="profile-metric"><div class="val">' + Math.round(d.totalMW) + '</div><div class="lbl">Total MW</div></div>' +
     '<div class="profile-metric"><div class="val">' + fmtN(d.munis.size) + '</div><div class="lbl">Municipalities</div></div>' +
-    '<div class="profile-metric"><div class="val">' + avgMW + '</div><div class="lbl">Avg MW</div></div>' +
+    '<div class="profile-metric"><div class="val" style="color:' + (dOppPct > 50 ? '#ef4444' : dOppPct > 25 ? '#f97316' : '#22c55e') + ';">' + dOppPct + '%</div><div class="lbl">High/V.High Opp</div></div>' +
     '</div>';
+
+  // Opposition breakdown across this developer's portfolio
+  html += '<div style="margin-bottom:18px;">' +
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Opposition Across Portfolio</div>' +
+    ['Low','Moderate','High','Very High','Unknown'].map(lvl => {
+      const c = OPP[lvl];
+      const cnt = dOpp[lvl] || 0;
+      const pct = d.projects.length ? Math.round(cnt/d.projects.length*100) : 0;
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
+        '<span style="background:' + c.bg + ';color:' + c.text + ';font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:64px;text-align:center;">' + lvl + '</span>' +
+        '<div style="flex:1;height:7px;background:#f1f5f9;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + c.bar + ';border-radius:3px;opacity:0.8;"></div></div>' +
+        '<span style="font-size:13px;color:#64748b;min-width:32px;text-align:right;">' + cnt + '</span>' +
+        '</div>';
+    }).join('') + '</div>';
+
+  // Common key issues across portfolio (clickable → issue profile)
+  if (dTopIssues.length) {
+    html += '<div style="margin-bottom:18px;">' +
+      '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Common Key Issues</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
+      dTopIssues.map(([ki,cnt]) => issueTag(ki, {count: cnt>1?cnt:0})).join('') +
+      '</div></div>';
+  }
 
   html += '<div style="margin-bottom:18px;">' +
     '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Technology Mix</div>' +
@@ -1425,7 +1766,7 @@ function openDev(name) {
       const tc = TECH_COLORS[t]||'#6b7280';
       const pct = Math.round(cnt/d.projects.length*100);
       return '<div style="margin-bottom:7px;">' +
-        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;"><span style="color:#374151;font-weight:500;">' + t + '</span><span style="color:#64748b;">' + cnt + ' (' + pct + '%)</span></div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;"><span onclick="openTech(\'' + esc(t).replace(/'/g,"\\'") + '\')" style="color:#374151;font-weight:500;cursor:pointer;text-decoration:underline;text-decoration-color:#cbd5e1;">' + t + '</span><span style="color:#64748b;">' + cnt + ' (' + pct + '%)</span></div>' +
         '<div style="height:7px;background:#f1f5f9;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + Math.round(cnt/maxT*100) + '%;background:' + tc + ';border-radius:3px;"></div></div>' +
         '</div>';
     }).join('') + '</div>';
@@ -1447,7 +1788,7 @@ function openDev(name) {
 
   html += '<div><div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Municipalities (' + fmtN(d.munis.size) + ')</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
-    [...d.munis].slice(0,30).map(m => '<span onclick="openMuni(\'' + esc(m).replace(/'/g,"&#39;") + '\')" style="background:#f1f5f9;color:#374151;font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;cursor:pointer;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f1f5f9\'">' + esc(m) + '</span>').join('') +
+    [...d.munis].slice(0,30).map(m => '<span onclick="openMuni(\'' + esc(m).replace(/'/g,"\\'") + '\')" style="background:#f1f5f9;color:#374151;font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;cursor:pointer;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f1f5f9\'">' + esc(m) + '</span>').join('') +
     (d.munis.size > 30 ? '<span style="background:#f8fafc;color:#94a3b8;font-size:11px;padding:3px 9px;border-radius:20px;">+' + (d.munis.size-30) + ' more</span>' : '') +
     '</div></div>';
 
@@ -1520,7 +1861,7 @@ function openMuni(name) {
     html += '<div style="margin-bottom:18px;">' +
       '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Key Issues</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
-      topIssues.map(([ki,cnt]) => '<span style="background:#fef3c7;color:#92400e;font-size:13px;padding:2px 9px;border-radius:20px;">' + esc(ki) + (cnt>1?' ('+cnt+')':'') + '</span>').join('') +
+      topIssues.map(([ki,cnt]) => issueTag(ki, {count: cnt>1?cnt:0})).join('') +
       '</div></div>';
   }
 
@@ -1530,7 +1871,7 @@ function openMuni(name) {
       const tc = TECH_COLORS[t]||'#6b7280';
       const pct = Math.round(cnt/m.projects.length*100);
       return '<div style="margin-bottom:7px;">' +
-        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;"><span style="color:#374151;font-weight:500;">' + t + '</span><span style="color:#64748b;">' + cnt + ' (' + pct + '%)</span></div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;"><span onclick="openTech(\'' + esc(t).replace(/'/g,"\\'") + '\')" style="color:#374151;font-weight:500;cursor:pointer;text-decoration:underline;text-decoration-color:#cbd5e1;">' + t + '</span><span style="color:#64748b;">' + cnt + ' (' + pct + '%)</span></div>' +
         '<div style="height:7px;background:#f1f5f9;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + Math.round(cnt/maxT*100) + '%;background:' + tc + ';border-radius:3px;"></div></div>' +
         '</div>';
     }).join('') + '</div>';
@@ -1552,7 +1893,7 @@ function openMuni(name) {
 
   html += '<div style="margin-bottom:18px;"><div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Developers (' + fmtN(m.devs.size) + ')</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
-    devList.map(d => '<span onclick="openDev(\'' + esc(d).replace(/'/g,"&#39;") + '\')" style="background:#f1f5f9;color:#374151;font-size:11px;padding:3px 9px;border-radius:20px;cursor:pointer;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f1f5f9\'">' + esc(d) + '</span>').join('') +
+    devList.map(d => '<span onclick="openDev(\'' + esc(d).replace(/'/g,"\\'") + '\')" style="background:#f1f5f9;color:#374151;font-size:11px;padding:3px 9px;border-radius:20px;cursor:pointer;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f1f5f9\'">' + esc(d) + '</span>').join('') +
     (m.devs.size > 20 ? '<span style="background:#f8fafc;color:#94a3b8;font-size:11px;padding:3px 9px;border-radius:20px;">+' + (m.devs.size-20) + ' more</span>' : '') +
     '</div></div>';
 
@@ -1563,6 +1904,356 @@ function openMuni(name) {
 
   html += '</div>';
   openPanel(html);
+}
+
+// ================================================================
+// TECHNOLOGY PROFILE  (F6)
+// ================================================================
+function openTech(tech) {
+  const t = TECH_MAP[tech];
+  if (!t) return;
+  const tc = TECH_COLORS[tech] || '#6b7280';
+  const n = t.projects.length;
+  const avgMW = n ? (t.totalMW / n) : 0;
+  const highOpp = t.oppCounts.High + t.oppCounts['Very High'];
+  const oppPct = n ? Math.round(highOpp / n * 100) : 0;
+
+  // Top developers & municipalities within this technology
+  const devCnt = {}, muniCnt = {}, issueCnt = {};
+  t.projects.forEach(p => {
+    if (p.developer) devCnt[p.developer] = (devCnt[p.developer]||0)+1;
+    if (p.municipality) muniCnt[p.municipality] = (muniCnt[p.municipality]||0)+1;
+    parseIssues(p.key_issues).forEach(ki => { issueCnt[ki] = (issueCnt[ki]||0)+1; });
+  });
+  const topDevs = Object.entries(devCnt).sort((a,b) => b[1]-a[1]).slice(0, 12);
+  const topMunis = Object.entries(muniCnt).sort((a,b) => b[1]-a[1]).slice(0, 18);
+  const topIssues = Object.entries(issueCnt).sort((a,b) => b[1]-a[1]).slice(0, 15);
+  const topProjects = t.projects.slice().sort((a,b) => b._mw - a._mw).slice(0, 60);
+
+  let html = '<div class="profile-sticky-header" style="background:linear-gradient(135deg,' + tc + ',' + tc + 'cc);padding:20px 20px 16px;position:sticky;top:0;z-index:10;">' +
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">' +
+    '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.85);text-transform:uppercase;letter-spacing:0.08em;">Technology</div>' +
+    '<button onclick="closePanel()" style="background:rgba(0,0,0,0.25);color:white;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-size:14px;">&#x2715; Close</button>' +
+    '</div>' +
+    '<div style="font-size:22px;font-weight:800;color:white;line-height:1.2;">' + esc(tech) + '</div>' +
+    '<div style="font-size:14px;color:rgba(255,255,255,0.9);margin-top:4px;">' + fmtN(n) + ' Projects &middot; ' + Math.round(t.totalMW) + ' MW &middot; ' + fmtN(t.devs.size) + ' Developers &middot; ' + fmtN(t.munis.size) + ' Municipalities</div>' +
+    '</div>';
+
+  html += '<div style="padding:18px 20px;">';
+
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">' +
+    '<div class="profile-metric"><div class="val">' + fmtN(n) + '</div><div class="lbl">Projects</div></div>' +
+    '<div class="profile-metric"><div class="val" style="color:' + tc + ';">' + Math.round(t.totalMW) + '</div><div class="lbl">Total MW</div></div>' +
+    '<div class="profile-metric"><div class="val">' + (avgMW > 0 ? avgMW.toFixed(1) : '—') + '</div><div class="lbl">Avg MW</div></div>' +
+    '<div class="profile-metric"><div class="val" style="color:' + (oppPct > 50 ? '#ef4444' : oppPct > 25 ? '#f97316' : '#22c55e') + ';">' + oppPct + '%</div><div class="lbl">High/V.High Opp</div></div>' +
+    '</div>';
+
+  // Opposition breakdown
+  html += '<div style="margin-bottom:18px;">' +
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Opposition Mix</div>' +
+    ['Low','Moderate','High','Very High','Unknown'].map(lvl => {
+      const c = OPP[lvl];
+      const cnt = t.oppCounts[lvl] || 0;
+      const pct = n ? Math.round(cnt/n*100) : 0;
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
+        '<span style="background:' + c.bg + ';color:' + c.text + ';font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:64px;text-align:center;">' + lvl + '</span>' +
+        '<div style="flex:1;height:7px;background:#f1f5f9;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + c.bar + ';border-radius:3px;opacity:0.8;"></div></div>' +
+        '<span style="font-size:13px;color:#64748b;min-width:32px;text-align:right;">' + cnt + '</span>' +
+        '</div>';
+    }).join('') + '</div>';
+
+  if (topDevs.length) {
+    html += '<div style="margin-bottom:18px;"><div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Top Developers (' + fmtN(t.devs.size) + ')</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
+      topDevs.map(([d,cnt]) => '<span onclick="openDev(\'' + esc(d).replace(/'/g,"\\'") + '\')" style="background:#f1f5f9;color:#374151;font-size:11px;padding:3px 9px;border-radius:20px;cursor:pointer;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f1f5f9\'">' + esc(d) + (cnt>1?' ('+cnt+')':'') + '</span>').join('') +
+      '</div></div>';
+  }
+
+  if (topMunis.length) {
+    html += '<div style="margin-bottom:18px;"><div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Municipality Spread (' + fmtN(t.munis.size) + ')</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
+      topMunis.map(([m,cnt]) => '<span onclick="openMuni(\'' + esc(m).replace(/'/g,"\\'") + '\')" style="background:#f1f5f9;color:#374151;font-size:11px;padding:3px 9px;border-radius:20px;cursor:pointer;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f1f5f9\'">' + esc(m) + (cnt>1?' ('+cnt+')':'') + '</span>').join('') +
+      '</div></div>';
+  }
+
+  if (topIssues.length) {
+    html += '<div style="margin-bottom:18px;">' +
+      '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Common Key Issues</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
+      topIssues.map(([ki,cnt]) => issueTag(ki, {count: cnt>1?cnt:0})).join('') +
+      '</div></div>';
+  }
+
+  html += '<div style="margin-bottom:8px;">' +
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Largest Projects (' + fmtN(n) + ')</div>' +
+    '<div class="scrollable" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">' +
+    topProjects.map(p => {
+      const oppC = OPP[p._opp] || OPP['Unknown'];
+      return '<div class="entity-row" onclick="openProject(' + p.id + ')">' +
+        '<div><div style="font-size:14px;font-weight:600;color:#0f172a;">' + esc(p.project_name||'—') + '</div>' +
+        '<div style="font-size:13px;color:#64748b;">' + esc(p.municipality||'—') + ' &middot; ' + esc(p.developer||'—') + '</div></div>' +
+        '<div style="text-align:right;"><div style="font-size:14px;font-weight:600;color:#3b82f6;">' + (p._mw>0?p._mw.toFixed(1)+' MW':'—') + '</div>' +
+        '<span style="background:' + oppC.bg + ';color:' + oppC.text + ';font-size:12px;font-weight:600;padding:1px 5px;border-radius:8px;">' + p._opp + '</span></div>' +
+        '</div>';
+    }).join('') +
+    (n > 60 ? '<div style="padding:9px 13px;font-size:13px;color:#94a3b8;text-align:center;">+' + (n-60) + ' more</div>' : '') +
+    '</div></div>';
+
+  html += '</div>';
+  openPanel(html);
+}
+
+// ================================================================
+// KEY ISSUES  (F4)
+// ================================================================
+function issueTag(ki, opts) {
+  opts = opts || {};
+  const cnt = opts.count ? ' (' + opts.count + ')' : '';
+  const arg = esc(ki).replace(/'/g, "\\'");
+  return '<span onclick="event.stopPropagation();openIssue(\'' + arg + '\')" ' +
+    'style="background:#fef3c7;color:#92400e;font-size:13px;padding:2px 9px;border-radius:20px;cursor:pointer;transition:background 0.1s;" ' +
+    'onmouseover="this.style.background=\'#fde68a\'" onmouseout="this.style.background=\'#fef3c7\'">' + esc(ki) + cnt + '</span>';
+}
+
+function openIssue(tag) {
+  const key = (tag || '').toLowerCase().trim();
+  const e = ISSUE_MAP[key];
+  if (!e) return;
+  const n = e.projects.length;
+  const highOpp = e.oppCounts.High + e.oppCounts['Very High'];
+  const oppPct = n ? Math.round(highOpp / n * 100) : 0;
+
+  // Top developers & municipalities encountering this issue
+  const devCnt = {}, muniCnt = {};
+  e.projects.forEach(p => {
+    if (p.developer) devCnt[p.developer] = (devCnt[p.developer] || 0) + 1;
+    if (p.municipality) muniCnt[p.municipality] = (muniCnt[p.municipality] || 0) + 1;
+  });
+  const topDevs = Object.entries(devCnt).sort((a,b) => b[1]-a[1]).slice(0, 12);
+  const topMunis = Object.entries(muniCnt).sort((a,b) => b[1]-a[1]).slice(0, 12);
+
+  let html = '<div class="profile-sticky-header" style="background:linear-gradient(135deg,#78350f,#92400e);padding:20px 20px 16px;position:sticky;top:0;z-index:10;">' +
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">' +
+    '<div style="font-size:12px;font-weight:700;color:#fcd34d;text-transform:uppercase;letter-spacing:0.08em;">Key Issue</div>' +
+    '<button onclick="closePanel()" style="background:#451a03;color:#fbbf24;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-size:14px;">&#x2715; Close</button>' +
+    '</div>' +
+    '<div style="font-size:21px;font-weight:800;color:white;line-height:1.3;text-transform:capitalize;">' + esc(e.label) + '</div>' +
+    '<div style="font-size:14px;color:#fed7aa;margin-top:4px;">' + fmtN(n) + ' Projects &middot; ' + Math.round(e.totalMW) + ' MW &middot; ' + fmtN(e.munis.size) + ' Municipalities</div>' +
+    '</div>';
+
+  html += '<div style="padding:18px 20px;">';
+
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">' +
+    '<div class="profile-metric"><div class="val">' + fmtN(n) + '</div><div class="lbl">Projects</div></div>' +
+    '<div class="profile-metric"><div class="val">' + Math.round(e.totalMW) + '</div><div class="lbl">Total MW</div></div>' +
+    '<div class="profile-metric"><div class="val" style="color:#ef4444;">' + oppPct + '%</div><div class="lbl">High/V.High Opp</div></div>' +
+    '<div class="profile-metric"><div class="val" style="color:#8b5cf6;">' + fmtN(e.devs.size) + '</div><div class="lbl">Developers</div></div>' +
+    '</div>';
+
+  // Opposition breakdown
+  html += '<div style="margin-bottom:18px;">' +
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Opposition Where This Issue Appears</div>' +
+    ['Low','Moderate','High','Very High','Unknown'].map(lvl => {
+      const c = OPP[lvl];
+      const cnt = e.oppCounts[lvl] || 0;
+      const pct = n ? Math.round(cnt/n*100) : 0;
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
+        '<span style="background:' + c.bg + ';color:' + c.text + ';font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:64px;text-align:center;">' + lvl + '</span>' +
+        '<div style="flex:1;height:7px;background:#f1f5f9;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + c.bar + ';border-radius:3px;opacity:0.8;"></div></div>' +
+        '<span style="font-size:13px;color:#64748b;min-width:32px;text-align:right;">' + cnt + '</span>' +
+        '</div>';
+    }).join('') + '</div>';
+
+  if (topDevs.length) {
+    html += '<div style="margin-bottom:18px;"><div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Developers Facing This Issue (' + fmtN(e.devs.size) + ')</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
+      topDevs.map(([d,cnt]) => '<span onclick="openDev(\'' + esc(d).replace(/'/g,"\\'") + '\')" style="background:#f1f5f9;color:#374151;font-size:11px;padding:3px 9px;border-radius:20px;cursor:pointer;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f1f5f9\'">' + esc(d) + (cnt>1?' ('+cnt+')':'') + '</span>').join('') +
+      '</div></div>';
+  }
+
+  if (topMunis.length) {
+    html += '<div style="margin-bottom:18px;"><div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Municipalities With This Issue (' + fmtN(e.munis.size) + ')</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
+      topMunis.map(([m,cnt]) => '<span onclick="openMuni(\'' + esc(m).replace(/'/g,"\\'") + '\')" style="background:#f1f5f9;color:#374151;font-size:11px;padding:3px 9px;border-radius:20px;cursor:pointer;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f1f5f9\'">' + esc(m) + (cnt>1?' ('+cnt+')':'') + '</span>').join('') +
+      '</div></div>';
+  }
+
+  html += '<div style="margin-bottom:8px;">' +
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">All Projects With This Issue (' + fmtN(n) + ')</div>' +
+    '<div class="scrollable" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">' +
+    e.projects.slice(0, 60).map(p => {
+      const oppC = OPP[p._opp] || OPP['Unknown'];
+      return '<div class="entity-row" onclick="openProject(' + p.id + ')">' +
+        '<div><div style="font-size:14px;font-weight:600;color:#0f172a;">' + esc(p.project_name||'—') + '</div>' +
+        '<div style="font-size:13px;color:#64748b;">' + esc(p.municipality||'—') + ' &middot; ' + esc(p.developer||'—') + '</div></div>' +
+        '<div style="text-align:right;"><div style="font-size:14px;font-weight:600;color:#3b82f6;">' + (p._mw>0?p._mw.toFixed(1)+' MW':'—') + '</div>' +
+        '<span style="background:' + oppC.bg + ';color:' + oppC.text + ';font-size:12px;font-weight:600;padding:1px 5px;border-radius:8px;">' + p._opp + '</span></div>' +
+        '</div>';
+    }).join('') +
+    (n > 60 ? '<div style="padding:9px 13px;font-size:13px;color:#94a3b8;text-align:center;">+' + (n-60) + ' more</div>' : '') +
+    '</div></div>';
+
+  html += '</div>';
+  openPanel(html);
+}
+
+// ================================================================
+// LEADERBOARDS  (F3)
+// ================================================================
+let currentLB = 'devs';
+function setLB(cat) { currentLB = cat; renderLeaderboards(); }
+
+function devOppRate(d) {
+  let h = 0;
+  d.projects.forEach(p => { if (p._opp === 'High' || p._opp === 'Very High') h++; });
+  return d.projects.length ? h / d.projects.length : 0;
+}
+
+function lbRank(i) {
+  const c = i === 0 ? '#eab308' : i === 1 ? '#94a3b8' : i === 2 ? '#d97706' : '#cbd5e1';
+  const bg = i < 3 ? c + '22' : '#f1f5f9';
+  const fg = i < 3 ? c : '#94a3b8';
+  return '<span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:' + bg + ';color:' + fg + ';font-size:13px;font-weight:800;">' + (i + 1) + '</span>';
+}
+
+function lbCell(content, opts) {
+  opts = opts || {};
+  const align = opts.align || 'right';
+  const color = opts.color || '#0f172a';
+  const weight = opts.weight || '600';
+  const size = opts.size || '15px';
+  return '<td style="padding:11px 16px;text-align:' + align + ';font-size:' + size + ';font-weight:' + weight + ';color:' + color + ';white-space:nowrap;">' + content + '</td>';
+}
+
+function lbNameCell(name) {
+  return '<td style="padding:11px 16px;text-align:left;font-size:15px;font-weight:700;color:#0f172a;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(name) + '</td>';
+}
+
+function lbShell(headers, rowsHtml, aligns) {
+  return '<div style="background:white;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f1f5f9;overflow-x:auto;">' +
+    '<table style="width:100%;border-collapse:collapse;">' +
+    '<thead><tr style="border-bottom:2px solid #e2e8f0;background:#f8fafc;">' +
+    headers.map((h, i) => '<th style="padding:10px 16px;text-align:' + (aligns[i] || 'right') + ';font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">' + h + '</th>').join('') +
+    '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
+}
+
+function lbTechFilter(t) {
+  document.querySelectorAll('#techFilters input').forEach(cb => { cb.checked = (cb.value === t); });
+  applyFilters();
+  switchTab('map');
+}
+
+function renderLeaderboards() {
+  const cats = [
+    { id: 'devs',     label: '&#127959; Top Developers' },
+    { id: 'munis',    label: '&#127963; Top Municipalities' },
+    { id: 'opp',      label: '&#128293; Highest Opposition' },
+    { id: 'projects', label: '&#9889; Largest Projects' },
+    { id: 'techs',    label: '&#128268; Top Technologies' },
+    { id: 'issues',   label: '&#128204; Key Issues' }
+  ];
+  const catsEl = document.getElementById('lbCats');
+  if (catsEl) {
+    catsEl.innerHTML = cats.map(c => {
+      const active = c.id === currentLB;
+      return '<button onclick="setLB(\'' + c.id + '\')" style="background:' + (active ? '#0f172a' : 'white') + ';color:' + (active ? 'white' : '#475569') + ';border:1px solid ' + (active ? '#0f172a' : '#e2e8f0') + ';border-radius:20px;padding:7px 15px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">' + c.label + '</button>';
+    }).join('');
+  }
+
+  const rowStyle = 'style="border-bottom:1px solid #f1f5f9;cursor:pointer;" class="lb-row" onmouseover="this.style.background=\'#f0f9ff\'" onmouseout="this.style.background=\'white\'"';
+  let html = '';
+
+  if (currentLB === 'devs') {
+    const list = DEVS.slice(0, 100);
+    const rows = list.map((d, i) =>
+      '<tr ' + rowStyle + ' onclick="openDev(\'' + esc(d.name).replace(/'/g, "\\'") + '\')">' +
+      lbCell(lbRank(i), { align: 'center' }) + lbNameCell(d.name) +
+      lbCell(fmtN(d.projects.length), { color: '#475569' }) +
+      lbCell(Math.round(d.totalMW) > 0 ? fmtN(Math.round(d.totalMW)) : '—', { color: '#3b82f6', weight: '700' }) +
+      lbCell(fmtN(d.munis.size), { color: '#8b5cf6' }) +
+      '</tr>').join('');
+    html = lbShell(['#', 'Developer', 'Projects', 'Total MW', 'Munis'], rows, ['center', 'left', 'right', 'right', 'right']);
+  } else if (currentLB === 'munis') {
+    const list = MUNIS.slice(0, 100);
+    const rows = list.map((m, i) => {
+      const highOpp = m.oppCounts.High + m.oppCounts['Very High'];
+      const pct = m.projects.length ? Math.round(highOpp / m.projects.length * 100) : 0;
+      const bc = pct > 50 ? '#ef4444' : pct > 25 ? '#f97316' : '#22c55e';
+      return '<tr ' + rowStyle + ' onclick="openMuni(\'' + esc(m.name).replace(/'/g, "\\'") + '\')">' +
+        lbCell(lbRank(i), { align: 'center' }) + lbNameCell(m.name) +
+        lbCell(fmtN(m.projects.length), { color: '#475569' }) +
+        lbCell(Math.round(m.totalMW) > 0 ? fmtN(Math.round(m.totalMW)) : '—', { color: '#3b82f6', weight: '700' }) +
+        lbCell(pct + '%', { color: bc, weight: '700' }) +
+        '</tr>';
+    }).join('');
+    html = lbShell(['#', 'Municipality', 'Projects', 'Total MW', 'High Opp %'], rows, ['center', 'left', 'right', 'right', 'right']);
+  } else if (currentLB === 'opp') {
+    const list = MUNIS.filter(m => m.projects.length >= 2)
+      .map(m => {
+        const highOpp = m.oppCounts.High + m.oppCounts['Very High'];
+        return { m: m, highOpp: highOpp, pct: m.projects.length ? highOpp / m.projects.length : 0 };
+      })
+      .filter(x => x.highOpp > 0)
+      .sort((a, b) => (b.pct - a.pct) || (b.highOpp - a.highOpp))
+      .slice(0, 100);
+    const rows = list.map((x, i) => {
+      const pct = Math.round(x.pct * 100);
+      return '<tr ' + rowStyle + ' onclick="openMuni(\'' + esc(x.m.name).replace(/'/g, "\\'") + '\')">' +
+        lbCell(lbRank(i), { align: 'center' }) + lbNameCell(x.m.name) +
+        lbCell(fmtN(x.m.projects.length), { color: '#475569' }) +
+        lbCell(fmtN(x.highOpp), { color: '#ef4444', weight: '700' }) +
+        lbCell(pct + '%', { color: '#ef4444', weight: '700' }) +
+        '</tr>';
+    }).join('');
+    html = lbShell(['#', 'Municipality', 'Projects', 'High / V.High', 'Opp %'], rows, ['center', 'left', 'right', 'right', 'right']);
+  } else if (currentLB === 'projects') {
+    const list = PROJECTS.filter(p => p._mw > 0).slice().sort((a, b) => b._mw - a._mw).slice(0, 100);
+    const rows = list.map((p, i) =>
+      '<tr ' + rowStyle + ' onclick="openProject(' + p.id + ')">' +
+      lbCell(lbRank(i), { align: 'center' }) + lbNameCell(p.project_name || '—') +
+      lbCell(esc(p.municipality || '—'), { align: 'left', color: '#475569', weight: '500' }) +
+      lbCell(techBadge(p._tech), { align: 'left' }) +
+      lbCell(p._mw.toFixed(1), { color: '#3b82f6', weight: '700' }) +
+      '</tr>').join('');
+    html = lbShell(['#', 'Project', 'Municipality', 'Technology', 'MW'], rows, ['center', 'left', 'left', 'left', 'right']);
+  } else if (currentLB === 'techs') {
+    const agg = {};
+    PROJECTS.forEach(p => {
+      const t = p._tech;
+      if (!agg[t]) agg[t] = { tech: t, count: 0, mw: 0 };
+      agg[t].count++; agg[t].mw += p._mw;
+    });
+    const list = Object.values(agg).sort((a, b) => b.mw - a.mw);
+    const rows = list.map((t, i) => {
+      const avg = t.count ? (t.mw / t.count) : 0;
+      return '<tr ' + rowStyle + ' onclick="lbTechFilter(\'' + esc(t.tech).replace(/'/g, "\\'") + '\')">' +
+        lbCell(lbRank(i), { align: 'center' }) +
+        '<td style="padding:11px 16px;text-align:left;">' + techBadge(t.tech) + '</td>' +
+        lbCell(fmtN(t.count), { color: '#475569' }) +
+        lbCell(Math.round(t.mw) > 0 ? fmtN(Math.round(t.mw)) : '—', { color: '#3b82f6', weight: '700' }) +
+        lbCell(avg > 0 ? avg.toFixed(1) : '—', { color: '#64748b' }) +
+        '</tr>';
+    }).join('');
+    html = lbShell(['#', 'Technology', 'Projects', 'Total MW', 'Avg MW'], rows, ['center', 'left', 'right', 'right', 'right']);
+  } else if (currentLB === 'issues') {
+    const list = ISSUES.slice(0, 100);
+    const rows = list.map((e, i) => {
+      const highOpp = e.oppCounts.High + e.oppCounts['Very High'];
+      const pct = e.projects.length ? Math.round(highOpp / e.projects.length * 100) : 0;
+      const bc = pct > 50 ? '#ef4444' : pct > 25 ? '#f97316' : '#22c55e';
+      return '<tr ' + rowStyle + ' onclick="openIssue(\'' + esc(e.label).replace(/'/g, "\\'") + '\')">' +
+        lbCell(lbRank(i), { align: 'center' }) +
+        '<td style="padding:11px 16px;text-align:left;font-size:15px;font-weight:700;color:#92400e;text-transform:capitalize;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(e.label) + '</td>' +
+        lbCell(fmtN(e.projects.length), { color: '#475569' }) +
+        lbCell(Math.round(e.totalMW) > 0 ? fmtN(Math.round(e.totalMW)) : '—', { color: '#3b82f6', weight: '700' }) +
+        lbCell(pct + '%', { color: bc, weight: '700' }) +
+        '</tr>';
+    }).join('');
+    html = lbShell(['#', 'Key Issue', 'Projects', 'Total MW', 'High Opp %'], rows, ['center', 'left', 'right', 'right', 'right']);
+  }
+
+  const contentEl = document.getElementById('lbContent');
+  if (contentEl) contentEl.innerHTML = html;
 }
 
 // ================================================================
