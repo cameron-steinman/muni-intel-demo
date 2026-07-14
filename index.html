@@ -152,14 +152,19 @@ input.filter-input::placeholder { color:#475569; }
     </div>
     <div class="filter-section">
       <div class="filter-label">Opposition Level</div>
-      <select class="filter-select" id="oppFilter" onchange="applyFilters()">
-        <option value="">All Levels</option>
-        <option value="Low">Low</option>
-        <option value="Moderate">Moderate</option>
-        <option value="High">High</option>
-        <option value="Very High">Very High</option>
-        <option value="Unknown">Unknown</option>
-      </select>
+      <div id="oppToggles" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+        <button class="opp-toggle" data-opp="Low" onclick="toggleOpp(this)" style="background:transparent;color:#15803d;border:1px solid #15803d;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;">Low</button>
+        <button class="opp-toggle" data-opp="Moderate" onclick="toggleOpp(this)" style="background:transparent;color:#854d0e;border:1px solid #854d0e;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;">Moderate</button>
+        <button class="opp-toggle" data-opp="High" onclick="toggleOpp(this)" style="background:transparent;color:#991b1b;border:1px solid #991b1b;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;">High</button>
+        <button class="opp-toggle" data-opp="Very High" onclick="toggleOpp(this)" style="background:transparent;color:#9d174d;border:1px solid #9d174d;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;">Very High</button>
+        <button class="opp-toggle" data-opp="Unknown" onclick="toggleOpp(this)" style="background:transparent;color:#475569;border:1px solid #475569;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;">Unknown</button>
+      </div>
+      <!-- Hidden select keeps applyFilters working; we manage it via toggleOpp -->
+      <select id="oppFilter" style="display:none;"></select>
+      <div id="keyIssuesSection" style="display:none;margin-top:8px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin-bottom:5px;">Key Issues</div>
+        <div id="keyIssuesPills" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+      </div>
     </div>
     <div class="filter-section">
       <div class="filter-label">Capacity (MW)</div>
@@ -742,7 +747,8 @@ function applyFilters() {
   const q = document.getElementById('searchInput').value.toLowerCase();
   const techs = getCheckedTechs();
   const status = document.getElementById('statusFilter').value;
-  const opp = document.getElementById('oppFilter').value;
+  const activeOpps = Array.from(document.querySelectorAll('.opp-toggle.active')).map(b => b.dataset.opp);
+  const opp = activeOpps.length > 0 ? activeOpps : null;
   const minMW = parseFloat(document.getElementById('minMW').value) || 0;
   const maxMW = parseFloat(document.getElementById('maxMW').value) || Infinity;
 
@@ -753,7 +759,7 @@ function applyFilters() {
     }
     if (techs.length && !techs.includes(p._tech)) return false;
     if (status && p.status !== status) return false;
-    if (opp && p._opp !== opp) return false;
+    if (opp && !opp.includes(p._opp)) return false;
     if (p._mw < minMW || p._mw > maxMW) return false;
     return true;
   });
@@ -764,7 +770,7 @@ function applyFilters() {
   if (q) fc++;
   if (techs.length) fc++;
   if (status) fc++;
-  if (opp) fc++;
+  if (activeOpps && activeOpps.length) fc++;
   if (document.getElementById('minMW').value || document.getElementById('maxMW').value) fc++;
   document.getElementById('filterCount').textContent = fc > 0
     ? fc + ' filter' + (fc>1?'s':'') + ' active — ' + fmtN(filtered.length) + ' projects'
@@ -782,11 +788,63 @@ function applyFilters() {
   updateMarkers();
 }
 
+function toggleOpp(btn) {
+  btn.classList.toggle('active');
+  const isActive = btn.classList.contains('active');
+  const opp = btn.dataset.opp;
+  const OPP_C = {
+    'Low': {bg:'#dcfce7',text:'#15803d'},
+    'Moderate': {bg:'#fef9c3',text:'#854d0e'},
+    'High': {bg:'#fee2e2',text:'#991b1b'},
+    'Very High': {bg:'#fce7f3',text:'#9d174d'},
+    'Unknown': {bg:'#f1f5f9',text:'#475569'}
+  };
+  const c = OPP_C[opp] || {bg:'#e2e8f0',text:'#374151'};
+  if (isActive) {
+    btn.style.background = c.bg;
+    btn.style.color = c.text;
+  } else {
+    btn.style.background = 'transparent';
+  }
+  applyFilters();
+  updateKeyIssues();
+}
+
+function updateKeyIssues() {
+  const activeOpps = Array.from(document.querySelectorAll('.opp-toggle.active')).map(b => b.dataset.opp);
+  const section = document.getElementById('keyIssuesSection');
+  const pills = document.getElementById('keyIssuesPills');
+  if (!activeOpps.length) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+  const issueCnt = {};
+  filtered.forEach(p => {
+    if (!activeOpps.includes(p._opp)) return;
+    if (p.key_issues) {
+      p.key_issues.split(',').map(k => k.trim()).filter(Boolean).forEach(ki => {
+        issueCnt[ki] = (issueCnt[ki] || 0) + 1;
+      });
+    }
+  });
+  const sorted = Object.entries(issueCnt).sort((a,b) => b[1]-a[1]).slice(0, 20);
+  pills.innerHTML = sorted.map(([ki, cnt]) =>
+    '<span style="background:#1e293b;color:#cbd5e1;font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid #334155;">' +
+    ki + (cnt > 1 ? ' <span style="color:#64748b;">(' + cnt + ')</span>' : '') + '</span>'
+  ).join('');
+}
+
 function clearFilters() {
   document.getElementById('searchInput').value = '';
   document.querySelectorAll('#techFilters input').forEach(cb => cb.checked = false);
   document.getElementById('statusFilter').value = '';
   document.getElementById('oppFilter').value = '';
+  document.querySelectorAll('.opp-toggle.active').forEach(b => {
+    b.classList.remove('active');
+    b.style.background = 'transparent';
+  });
+  document.getElementById('keyIssuesSection').style.display = 'none';
   document.getElementById('minMW').value = '';
   document.getElementById('maxMW').value = '';
   applyFilters();
@@ -960,6 +1018,66 @@ let mapInst = null;
 let markers = [];
 let boundaryLayer = null;
 let boundaryVisible = true;
+let cdLayer = null;
+let cdVisible = false;
+
+function toggleCSD() {
+  if (!boundaryLayer || !mapInst) return;
+  boundaryVisible = !boundaryVisible;
+  const btn = document.getElementById('csdToggle');
+  if (boundaryVisible) {
+    boundaryLayer.addTo(mapInst);
+    if (btn) btn.innerHTML = '&#9638; CSD Layer ON';
+  } else {
+    mapInst.removeLayer(boundaryLayer);
+    if (btn) btn.innerHTML = '&#9638; CSD Layer OFF';
+  }
+}
+
+function toggleCD() {
+  if (!mapInst) return;
+  if (!cdLayer) {
+    // Lazy load CD layer
+    fetch('ontario_cd.geojson')
+      .then(r => r.json())
+      .then(data => {
+        cdLayer = L.geoJSON(data, {
+          style: function() {
+            return {
+              fillColor: 'transparent',
+              fillOpacity: 0,
+              color: '#f59e0b',
+              weight: 2.5,
+              opacity: 0.8
+            };
+          },
+          onEachFeature: function(feature, layer) {
+            const p = feature.properties;
+            layer.bindTooltip(
+              '<div style="font-weight:700;font-size:13px;">' + (p.CDNAME||'') + '</div>' +
+              '<div style="font-size:12px;color:#64748b;">' + (p.CDTYPE||'') + '</div>',
+              {sticky: true, opacity: 0.95}
+            );
+          }
+        });
+        cdLayer.addTo(mapInst);
+        cdVisible = true;
+        const btn = document.getElementById('cdToggle');
+        if (btn) btn.innerHTML = '&#9632; CD Layer ON';
+      })
+      .catch(function(err) { console.warn('CD GeoJSON load failed:', err); });
+    return;
+  }
+  cdVisible = !cdVisible;
+  const btn = document.getElementById('cdToggle');
+  if (cdVisible) {
+    cdLayer.addTo(mapInst);
+    if (btn) btn.innerHTML = '&#9632; CD Layer ON';
+  } else {
+    mapInst.removeLayer(cdLayer);
+    if (btn) btn.innerHTML = '&#9632; CD Layer OFF';
+  }
+}
 
 // Mapping from demo municipality name → GIS CSDNAME (for polygon lookup)
 // and reverse mapping CSDNAME → first demo name (for click handler)
@@ -981,19 +1099,27 @@ function initMap() {
   }).addTo(mapInst);
 
   // Load Ontario municipal boundary polygons
-  fetch('ontario_boundaries.geojson')
+  fetch('ontario_csd.geojson')
     .then(r => r.json())
     .then(data => {
+      // Build CSD metadata lookup keyed by CSDNAME
+      window.CSD_META = {};
+      data.features.forEach(function(f) {
+        const p = f.properties;
+        if (p.CSDNAME) {
+          CSD_META[p.CSDNAME] = {csdtype: p.CSDTYPE, cdname: p.CDNAME, cduid: p.CDUID};
+        }
+      });
       let hoveredLayer = null;
       boundaryLayer = L.geoJSON(data, {
         style: function(feature) {
-          const demoName = GIS_TO_DEMO[feature.properties.CSDNAME] || feature.properties.demo_name;
+          const demoName = GIS_TO_DEMO[feature.properties.CSDNAME] || feature.properties.CSDNAME;
           const hasMuni = demoName && MUNI_MAP[demoName];
           return {
             fillColor: hasMuni ? '#3b82f6' : '#94a3b8',
             fillOpacity: hasMuni ? 0.12 : 0.04,
             color: hasMuni ? '#3b82f6' : '#94a3b8',
-            weight: hasMuni ? 1.5 : 0.5,
+            weight: hasMuni ? 1.5 : 0.4,
             opacity: hasMuni ? 0.6 : 0.25
           };
         },
@@ -1039,6 +1165,26 @@ function initMap() {
         return div;
       };
       btn.addTo(mapInst);
+
+      // CSD toggle button
+      const csdBtn = L.control({position: 'topright'});
+      csdBtn.onAdd = function() {
+        const div = L.DomUtil.create('div', '');
+        div.innerHTML = '<button id="csdToggle" onclick="toggleCSD()" style="background:white;border:1px solid #94a3b8;border-radius:7px;padding:5px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.12);display:block;margin-top:4px;">&#9638; CSD Layer ON</button>';
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      };
+      csdBtn.addTo(mapInst);
+
+      // CD toggle button
+      const cdBtn = L.control({position: 'topright'});
+      cdBtn.onAdd = function() {
+        const div = L.DomUtil.create('div', '');
+        div.innerHTML = '<button id="cdToggle" onclick="toggleCD()" style="background:white;border:1px solid #94a3b8;border-radius:7px;padding:5px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.12);display:block;margin-top:4px;">&#9632; CD Layer OFF</button>';
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      };
+      cdBtn.addTo(mapInst);
     })
     .catch(function(err) { console.warn('Boundary GeoJSON load failed:', err); });
 
@@ -1329,6 +1475,23 @@ function openMuni(name) {
     '<button onclick="closePanel()" style="background:#334155;color:#94a3b8;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-size:14px;">&#x2715; Close</button>' +
     '</div>' +
     '<div style="font-size:14px;color:#94a3b8;">' + fmtN(m.projects.length) + ' Projects &middot; ' + Math.round(m.totalMW) + ' MW Total</div>' +
+    (function() {
+      const csdName = window.DEMO_TO_GIS && window.DEMO_TO_GIS[name] ? window.DEMO_TO_GIS[name] : name;
+      const meta = window.CSD_META && window.CSD_META[csdName];
+      if (!meta) return '';
+      const csdTypeMap = {
+        'CY':'City','T':'Town','TP':'Township','M':'Municipality','VL':'Village',
+        'CV':'County/Regional Municipality','DM':'District Municipality','CTY':'County',
+        'RGM':'Regional Municipality','MU':'Municipality','S-É':'Unorganized',
+        'NO':'Unorganized','IRI':'Indian Reserve','SNO':'Subdivision of Unorganized',
+        'SRV':'Service Area','MCM':'Municipal Corporation'
+      };
+      const singleTierTypes = new Set(['CY','T','M','MU','CV','CTY','RGM','DM','MTL','UCM']);
+      const typeLabel = csdTypeMap[meta.csdtype] || meta.csdtype || '';
+      const tierLabel = singleTierTypes.has(meta.csdtype) ? '(single-tier)' : '(lower-tier)';
+      const cdPart = meta.cdname ? ' · ' + meta.cdname + ' (upper-tier)' : '';
+      return '<div style="font-size:13px;color:#94a3b8;margin-top:3px;">' + typeLabel + ' ' + tierLabel + cdPart + '</div>';
+    })() +
     '</div>';
 
   html += '<div style="padding:18px 20px;">';
