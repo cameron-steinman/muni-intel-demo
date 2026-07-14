@@ -958,12 +958,89 @@ function renderDocs() {
 // ================================================================
 let mapInst = null;
 let markers = [];
+let boundaryLayer = null;
+let boundaryVisible = true;
+
+// Mapping from demo municipality name → GIS CSDNAME (for polygon lookup)
+// and reverse mapping CSDNAME → first demo name (for click handler)
+const DEMO_TO_GIS = {};
+const GIS_TO_DEMO = {};
+(function() {
+  // name_map: demo_name -> csdname (auto-generated from StatCan 2021 CSD, Ontario)
+  const name_map = {"Ajax":"Ajax","Algonquin Highlands":"Algonquin Highlands","Amherstburg":"Amherstburg","Armour":"Armour","Armour Township":"Armour","Armstrong Township":"Armstrong","Arnprior":"Arnprior","Arran-Elderslie":"Arran-Elderslie","Ashfield-Colborne-Wawanosh":"Ashfield-Colborne-Wawanosh","Aurora":"Aurora","Barrie":"Barrie","Blandford-Blenheim":"Blandford-Blenheim","Bluewater":"Bluewater","Bradford West Gwillimbury":"Bradford West Gwillimbury","Brampton":"Brampton","Brantford":"Brantford","Brockton":"Brockton","Brooke-Alvinston":"Brooke-Alvinston","Burlington":"Burlington","Cavan Monaghan Township":"Cavan Monaghan","Central Frontenac Township":"Central Frontenac","Central Manitoulin":"Central Manitoulin","Centre Hastings":"Centre Hastings","Centre Wellington Township":"Centre Wellington","Chapleau":"Chapleau","Chatham-Kent":"Chatham-Kent","City of Belleville":"Belleville","City of Brockville":"Brockville","City of Cambridge / City of Brantford / Township of North Dumfries / County of Brant":"Cambridge","City of Cornwall":"Cornwall","City of Dryden":"Dryden","City of Elliot Lake / Town of Blind River":"Elliot Lake","City of Guelph":"Guelph","City of Kawartha Lakes":"Kawartha Lakes","City of Kitchener":"Kitchener","City of Oshawa":"Oshawa","City of Ottawa / Arnprior area":"Ottawa","City of Owen Sound":"Owen Sound","City of Pickering":"Pickering","City of Quinte West":"Quinte West","City of Richmond Hill":"Richmond Hill","City of St. Catharines":"St. Catharines","City of Stratford":"Stratford","City of Thorold":"Thorold","City of Windsor":"Windsor","Clarington":"Clarington","Cobourg":"Cobourg","Collingwood":"Collingwood","Cornwall":"Cornwall","County of Brant":"Brant","Cramahe Township":"Cramahe","Dawn-Euphemia":"Dawn-Euphemia","Dorion":"Dorion","Drummond/North Elmsley":"Drummond/North Elmsley","East Gwillimbury":"East Gwillimbury","East Hawkesbury":"East Hawkesbury","East Zorra-Tavistock":"East Zorra-Tavistock","Elizabethtown-Kitley":"Elizabethtown-Kitley","Enniskillen Township":"Enniskillen","Enniskillen Township (Lambton County)":"Enniskillen","Espanola":"Espanola","Essa":"Essa","Fort Erie":"Fort Erie","Georgina":"Georgina","Goderich (Huron)":"Goderich","Greater Napanee":"Greater Napanee","Greater Sudbury":"Greater Sudbury / Grand Sudbury","Grey Highlands":"Grey Highlands","Grimsby":"Grimsby","Guelph":"Guelph","Haldimand County":"Haldimand","Halton Hills":"Halton Hills","Hamilton":"Hamilton","Hanover":"Hanover","Havelock-Belmont-Methuen":"Havelock-Belmont-Methuen","Hornepayne":"Hornepayne","Hudson":"Hudson","Huntsville":"Huntsville","Huron East":"Huron East","Huron-Kinloss":"Huron-Kinloss","Ignace":"Ignace","Kincardine":"Kincardine","Kingston":"Kingston","Kingsville":"Kingsville","Kirkland Lake":"Kirkland Lake","LaSalle":"LaSalle","Leamington":"Leamington","Lincoln":"Lincoln","London":"London","Loyalist Township":"Loyalist","Mapleton":"Mapleton","Markham":"Markham","Meaford":"Meaford","Middlesex Centre":"Middlesex Centre","Minden Hills":"Minden Hills","Minto":"Minto","Mississauga":"Mississauga","Mississippi Mills":"Mississippi Mills","Morris-Turnberry":"Morris-Turnberry","Municipality of Alfred and Plantagenet":"Alfred and Plantagenet","Municipality of Amherstburg":"Amherstburg","Municipality of Arran-Elderslie":"Arran-Elderslie","Municipality of Blind River":"Blind River","Municipality of Brock":"Brock","Municipality of Brooke-Alvinston (Lambton County)":"Brooke-Alvinston","Municipality of Central Elgin":"Central Elgin","Municipality of Central Huron":"Central Huron","Municipality of Coleman":"Coleman","Municipality of Huron Shores":"Huron Shores","Municipality of Huron-Kinloss":"Huron-Kinloss","Municipality of Kincardine":"Kincardine","Municipality of Kingsville":"Kingsville","Municipality of Lakeshore":"Lakeshore","Municipality of Lakeshore & Chatham-Kent":"Lakeshore","Municipality of Lakeshore & Town of Tecumseh":"Lakeshore","Municipality of Leamington":"Leamington","Municipality of Marmora and Lake":"Marmora and Lake","Municipality of McDougall":"McDougall","Municipality of Merrickville-Wolford":"Merrickville-Wolford","Municipality of Mississippi Mills":"Mississippi Mills","Municipality of Shuniah":"Shuniah","Municipality of South Huron":"South Huron","Municipality of South-West Oxford":"South-West Oxford","Municipality of Southwest Middlesex":"Southwest Middlesex","Municipality of Strathroy-Caradoc":"Strathroy-Caradoc","Municipality of Tay":"Tay","Municipality of Tweed":"Tweed","Municipality of West Grey":"West Grey","Municipality of West Perth":"West Perth","New Tecumseth":"New Tecumseth","Newmarket":"Newmarket","Niagara Falls":"Niagara Falls","Norfolk County":"Norfolk County","North Algona Wilberforce":"North Algona Wilberforce","North Bay":"North Bay","North Middlesex":"North Middlesex","Oakville":"Oakville","Oil Springs":"Oil Springs","Oliver Paipoonge":"Oliver Paipoonge","Orangeville":"Orangeville","Orillia":"Orillia","Oro-Medonte":"Oro-Medonte","Oshawa":"Oshawa","Otonabee-South Monaghan":"Otonabee-South Monaghan","Ottawa":"Ottawa","Parry Sound":"Parry Sound","Perth":"Perth","Perth East":"Perth East","Petawawa":"Petawawa","Peterborough":"Peterborough","Plympton-Wyoming":"Plympton-Wyoming","Port Colborne":"Port Colborne","Port Hope":"Port Hope","Powassan":"Powassan","Prince Edward County":"Prince Edward County","Prince Township":"Prince","Quinte West":"Quinte West","Ramara Township":"Ramara","Red Rock":"Red Rock","Rideau Lakes":"Rideau Lakes","Sarnia":"Sarnia","Sault Ste. Marie":"Sault Ste. Marie","Schreiber":"Schreiber","Scugog":"Scugog","Selwyn Township":"Selwyn","Shelburne":"Shelburne","South Algonquin":"South Algonquin","South Bruce Peninsula":"South Bruce Peninsula","South Dundas":"South Dundas","South Frontenac":"South Frontenac","South Glengarry":"South Glengarry","South-West Oxford":"South-West Oxford","Southwold":"Southwold","Springwater":"Springwater","St. Catharines":"St. Catharines","St. Clair":"St. Clair","St. Clair Township":"St. Clair","St. Clair Township (Lambton County)":"St. Clair","St. Thomas":"St. Thomas","Stratford":"Stratford","Strathroy-Caradoc":"Strathroy-Caradoc","Tay":"Tay","Tay Valley Township":"Tay Valley","Tecumseh":"Tecumseh","Temiskaming Shores":"Temiskaming Shores","Thames Centre":"Thames Centre","Thorold":"Thorold","Thunder Bay":"Thunder Bay","Tillsonburg":"Tillsonburg","Timmins":"Timmins","Toronto":"Toronto","Town of Amherstburg":"Amherstburg","Town of Caledon":"Caledon","Town of Cochrane":"Cochrane","Town of Deep River":"Deep River","Town of Essex":"Essex","Town of Fort Frances":"Fort Frances","Town of Gravenhurst":"Gravenhurst","Town of Huntsville":"Huntsville","Town of Iroquois Falls":"Iroquois Falls","Town of Kingsville":"Kingsville","Town of Petawawa":"Petawawa","Town of Whitby":"Whitby","Township of Adelaide Metcalfe":"Adelaide Metcalfe","Township of Amaranth":"Amaranth","Township of Central Frontenac":"Central Frontenac","Township of Centre Wellington":"Centre Wellington","Township of Chapple":"Chapple","Township of Chatsworth":"Chatsworth","Township of Clearview":"Clearview","Township of Cramahe":"Cramahe","Township of East Zorra-Tavistock":"East Zorra-Tavistock","Township of Edwardsburgh/Cardinal":"Edwardsburgh/Cardinal","Township of Elizabethtown-Kitley":"Elizabethtown-Kitley","Township of Hamilton":"Hamilton Township","Township of Malahide":"Malahide","Township of Mapleton":"Mapleton","Township of McDougall":"McDougall","Township of Mulmur":"Mulmur","Township of North Dumfries":"North Dumfries","Township of North Dundas":"North Dundas","Township of North Frontenac":"North Frontenac","Township of North Glengarry":"North Glengarry","Township of North Stormont":"North Stormont","Township of Puslinch":"Puslinch","Township of Rideau Lakes":"Rideau Lakes","Township of Selwyn":"Selwyn","Township of South Bruce":"South Bruce","Township of South Glengarry":"South Glengarry","Township of South Stormont":"South Stormont","Township of South West Oxford":"South-West Oxford","Township of Southgate":"Southgate","Township of Southwold":"Southwold","Township of Stirling-Rawdon":"Stirling-Rawdon","Township of Stone Mills":"Stone Mills","Township of Terrace Bay":"Terrace Bay","Tyendinaga":"Tyendinaga","Uxbridge":"Uxbridge","Vaughan":"Vaughan","Wasaga Beach":"Wasaga Beach","Waterloo":"Waterloo","Welland":"Welland","West Grey":"West Grey","Whitchurch-Stouffville":"Whitchurch-Stouffville","White River":"White River","Windsor":"Windsor","Woodstock":"Woodstock","Woolwich":"Woolwich","Zorra":"Zorra","→Municipality of Northern Bruce Peninsula":"Northern Bruce Peninsula","→Town of Milton":"Milton","→Wellington North":"Wellington North"};
+  for (const [demo, csd] of Object.entries(name_map)) {
+    DEMO_TO_GIS[demo] = csd;
+    if (!GIS_TO_DEMO[csd]) GIS_TO_DEMO[csd] = demo;
+  }
+})();
 
 function initMap() {
   mapInst = L.map('map').setView([48.0, -83.0], 6);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors', maxZoom: 18
   }).addTo(mapInst);
+
+  // Load Ontario municipal boundary polygons
+  fetch('ontario_boundaries.geojson')
+    .then(r => r.json())
+    .then(data => {
+      let hoveredLayer = null;
+      boundaryLayer = L.geoJSON(data, {
+        style: function(feature) {
+          const demoName = GIS_TO_DEMO[feature.properties.CSDNAME] || feature.properties.demo_name;
+          const hasMuni = demoName && MUNI_MAP[demoName];
+          return {
+            fillColor: hasMuni ? '#3b82f6' : '#94a3b8',
+            fillOpacity: hasMuni ? 0.12 : 0.04,
+            color: hasMuni ? '#3b82f6' : '#94a3b8',
+            weight: hasMuni ? 1.5 : 0.5,
+            opacity: hasMuni ? 0.6 : 0.25
+          };
+        },
+        onEachFeature: function(feature, layer) {
+          const csdName = feature.properties.CSDNAME;
+          const demoName = GIS_TO_DEMO[csdName] || feature.properties.demo_name || csdName;
+          const muni = MUNI_MAP[demoName];
+          if (!muni) return;
+
+          layer.bindTooltip(
+            '<div style="font-weight:700;font-size:13px;">' + esc(demoName) + '</div>' +
+            '<div style="font-size:12px;color:#64748b;">' + muni.projects.length + ' projects · ' + Math.round(muni.totalMW) + ' MW</div>',
+            {sticky: true, opacity: 0.95, className: ''}
+          );
+
+          layer.on('mouseover', function(e) {
+            if (hoveredLayer) hoveredLayer.setStyle({fillOpacity: hoveredLayer._origFillOpacity, weight: hoveredLayer._origWeight});
+            hoveredLayer = layer;
+            layer._origFillOpacity = layer.options.fillOpacity;
+            layer._origWeight = layer.options.weight;
+            layer.setStyle({fillOpacity: 0.35, weight: 2.5});
+            layer.bringToFront();
+          });
+          layer.on('mouseout', function(e) {
+            if (hoveredLayer === layer) {
+              layer.setStyle({fillOpacity: layer._origFillOpacity, weight: layer._origWeight});
+              hoveredLayer = null;
+            }
+          });
+          layer.on('click', function(e) {
+            L.DomEvent.stopPropagation(e);
+            openMuni(demoName);
+          });
+        }
+      });
+      boundaryLayer.addTo(mapInst);
+      // Add toggle button
+      const btn = L.control({position: 'topright'});
+      btn.onAdd = function() {
+        const div = L.DomUtil.create('div', '');
+        div.innerHTML = '<button id="boundaryToggle" onclick="toggleBoundaries()" style="background:white;border:1px solid #94a3b8;border-radius:7px;padding:5px 10px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.12);">&#9635; Boundaries ON</button>';
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      };
+      btn.addTo(mapInst);
+    })
+    .catch(function(err) { console.warn('Boundary GeoJSON load failed:', err); });
 
   PROJECTS.forEach(p => {
     const coords = getMuniCoords(p.municipality || '');
@@ -1001,6 +1078,19 @@ function updateMarkers() {
     if (visIds.has(m._pid)) { m.setOpacity(1); m.setStyle({fillOpacity:0.82}); }
     else { m.setOpacity(0.07); m.setStyle({fillOpacity:0.04}); }
   });
+}
+
+function toggleBoundaries() {
+  if (!boundaryLayer || !mapInst) return;
+  boundaryVisible = !boundaryVisible;
+  const btn = document.getElementById('boundaryToggle');
+  if (boundaryVisible) {
+    boundaryLayer.addTo(mapInst);
+    if (btn) btn.innerHTML = '&#9635; Boundaries ON';
+  } else {
+    mapInst.removeLayer(boundaryLayer);
+    if (btn) btn.innerHTML = '&#9635; Boundaries OFF';
+  }
 }
 
 // ================================================================
