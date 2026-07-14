@@ -784,6 +784,46 @@ PROJECTS.forEach(p => {
 });
 const PROCURES = Object.values(PROCURE_MAP).sort((a,b) => b.totalMW - a.totalMW);
 
+// MSR Status normalization + pipeline stage index (F9)
+const MSR_STAGES = ['Proposed','Pending','Approved','Under Construction','Operational','Denied','Cancelled','Unknown'];
+const MSR_COLORS = {
+  'Proposed':          {bg:'#dbeafe',text:'#1e3a8a',bar:'#3b82f6'},
+  'Pending':           {bg:'#fef9c3',text:'#854d0e',bar:'#eab308'},
+  'Approved':          {bg:'#d1fae5',text:'#065f46',bar:'#10b981'},
+  'Under Construction':{bg:'#ede9fe',text:'#4c1d95',bar:'#8b5cf6'},
+  'Operational':       {bg:'#dcfce7',text:'#14532d',bar:'#22c55e'},
+  'Denied':            {bg:'#fee2e2',text:'#7f1d1d',bar:'#ef4444'},
+  'Cancelled':         {bg:'#f3f4f6',text:'#374151',bar:'#9ca3af'},
+  'Unknown':           {bg:'#f8fafc',text:'#94a3b8',bar:'#cbd5e1'}
+};
+function normMSR(raw) {
+  if (!raw || !raw.trim()) return 'Unknown';
+  const r = raw.toLowerCase();
+  if (r.includes('operational') || r.includes('operating')) return 'Operational';
+  if (r.includes('legacy') && !r.includes('fit')) return 'Operational';
+  if (r.includes('legacy fit') || r.includes('legacy ppa')) return 'Operational';
+  if (r.includes('under construction') || (r.includes('construction') && !r.includes('pre'))) return 'Under Construction';
+  if (r.includes('granted') || r.includes('council supported') || r.includes('obtained') || r.includes('announced') || r === 'supported' || r.includes('covered by')) return 'Approved';
+  if (r.includes('denied') || r.includes('rejected') || r.includes('refused') || r.includes('not approved') || r.includes('not granted') || r.includes('not awarded') || r.includes('not deliverable') || r.includes('not selected') || r.includes('failed') || r.includes('not supported')) return 'Denied';
+  if (r.includes('cancelled') || r.includes('withdrawn') || r.includes('terminated') || r.includes('abandoned') || r.includes('dormant') || r.includes('not pursued') || r.includes('deferred-')) return 'Cancelled';
+  if (r.includes('pending') || r.includes('under review') || r.includes('in progress') || r.includes('submitted') || r.includes('sought') || r.includes('in development') || r.includes('deferred') || r.includes('on hold') || r.includes('feasibility') || r.includes('study') || r.includes('research')) return 'Pending';
+  if (r.includes('proposed') || r.includes('pre-development') || r.includes('not yet') || r.includes('not filed') || r.includes('not reached') || r.startsWith('lt2') || r === 'other') return 'Proposed';
+  if (r === 'approved') return 'Approved';
+  if (r === 'n/a' || r === 'none' || r === 'unknown' || r === '' || r.includes('not applicable') || r.includes('not required') || r.includes('not confirmed') || r.includes('not obtained') || r.includes('not formalized') || r.includes('never')) return 'Unknown';
+  return 'Unknown';
+}
+const MSR_MAP = {};
+MSR_STAGES.forEach(s => { MSR_MAP[s] = {stage:s, projects:[], totalMW:0, devs:new Set(), munis:new Set()}; });
+PROJECTS.forEach(p => {
+  const stage = normMSR(p.msr_status);
+  p._msr_stage = stage;
+  const e = MSR_MAP[stage];
+  e.projects.push(p);
+  e.totalMW += p._mw;
+  if (p.developer) e.devs.add(p.developer);
+  if (p.municipality) e.munis.add(p.municipality);
+});
+
 // Key-issue tag index (F4) — split on ; , or newline; dedupe per project
 function parseIssues(raw) {
   if (!raw) return [];
@@ -940,6 +980,45 @@ function clearFilters() {
 // ================================================================
 // TAB SWITCHING
 // ================================================================
+function setMSRFilter(stage) {
+  // Filter projects to a specific MSR stage and switch to map view
+  // We can't filter by MSR stage via sidebar (no MSR filter control), so open a panel listing projects
+  const e = MSR_MAP[stage];
+  if (!e) return;
+  const c = MSR_COLORS[stage] || MSR_COLORS['Unknown'];
+  const n = e.projects.length;
+  const topProjects = e.projects.slice().sort((a,b) => b._mw - a._mw).slice(0, 80);
+  let html = '<div class="profile-sticky-header" style="background:linear-gradient(135deg,' + c.bar + ',' + c.bar + 'cc);padding:20px 20px 16px;position:sticky;top:0;z-index:10;">' +
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">' +
+    '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.8);text-transform:uppercase;letter-spacing:0.08em;">Pipeline Stage</div>' +
+    '<button onclick="closePanel()" style="background:rgba(0,0,0,0.25);color:white;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-size:14px;">&#x2715; Close</button>' +
+    '</div>' +
+    '<div style="font-size:22px;font-weight:800;color:white;line-height:1.2;">' + esc(stage) + '</div>' +
+    '<div style="font-size:14px;color:rgba(255,255,255,0.85);margin-top:4px;">' + fmtN(n) + ' Projects &middot; ' + Math.round(e.totalMW) + ' MW &middot; ' + fmtN(e.devs.size) + ' Developers</div>' +
+    '</div>';
+  html += '<div style="padding:18px 20px;">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">' +
+    '<div class="profile-metric"><div class="val">' + fmtN(n) + '</div><div class="lbl">Projects</div></div>' +
+    '<div class="profile-metric"><div class="val" style="color:' + c.bar + ';">' + Math.round(e.totalMW) + '</div><div class="lbl">Total MW</div></div>' +
+    '<div class="profile-metric"><div class="val">' + (n ? (e.totalMW/n).toFixed(1) : '—') + '</div><div class="lbl">Avg MW</div></div>' +
+    '<div class="profile-metric"><div class="val" style="color:#8b5cf6;">' + fmtN(e.munis.size) + '</div><div class="lbl">Municipalities</div></div>' +
+    '</div>' +
+    '<div style="margin-bottom:8px;"><div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Projects (' + fmtN(n) + ')</div>' +
+    '<div class="scrollable" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">' +
+    topProjects.map(p => {
+      const oppC = OPP[p._opp] || OPP['Unknown'];
+      return '<div class="entity-row" onclick="openProject(' + p.id + ')">' +
+        '<div><div style="font-size:14px;font-weight:600;color:#0f172a;">' + esc(p.project_name||'—') + '</div>' +
+        '<div style="font-size:13px;color:#64748b;">' + esc(p.municipality||'—') + ' &middot; ' + esc(p.developer||'—') + '</div></div>' +
+        '<div style="text-align:right;"><div style="font-size:14px;font-weight:600;color:#3b82f6;">' + (p._mw>0?p._mw.toFixed(1)+' MW':'—') + '</div>' +
+        '<span style="background:' + oppC.bg + ';color:' + oppC.text + ';font-size:12px;font-weight:600;padding:1px 5px;border-radius:8px;">' + p._opp + '</span></div>' +
+        '</div>';
+    }).join('') +
+    (n > 80 ? '<div style="padding:9px 13px;font-size:13px;color:#94a3b8;text-align:center;">+' + (n-80) + ' more</div>' : '') +
+    '</div></div></div>';
+  openPanel(html);
+}
+
 // ================================================================
 // FILTER BREADCRUMBS  (F11)
 // ================================================================
@@ -948,7 +1027,7 @@ function pill(label, removeFn, clickFn, color) {
   const textC = '#312e81';
   return '<span style="display:inline-flex;align-items:center;gap:4px;background:' + color + ';color:' + textC + ';font-size:12px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap;">' +
     (clickFn ? '<span onclick="' + clickFn + '" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px;">' + label + '</span>' : label) +
-    '<span onclick="' + removeFn + '" style="cursor:pointer;font-size:14px;line-height:1;opacity:0.65;margin-left:1px;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.65'">&times;</span>' +
+    '<span onclick="' + removeFn + '" style="cursor:pointer;font-size:14px;line-height:1;opacity:0.65;margin-left:1px;" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=\'0.65\'">&times;</span>' +
     '</span>';
 }
 
@@ -2335,7 +2414,8 @@ function renderLeaderboards() {
     { id: 'projects', label: '&#9889; Largest Projects' },
     { id: 'techs',       label: '&#128268; Top Technologies' },
     { id: 'issues',      label: '&#128204; Key Issues' },
-    { id: 'procurement', label: '&#128196; Procurement Programs' }
+    { id: 'procurement', label: '&#128196; Procurement Programs' },
+    { id: 'pipeline',    label: '&#128201; Project Pipeline' }
   ];
   const catsEl = document.getElementById('lbCats');
   if (catsEl) {
@@ -2452,8 +2532,61 @@ function renderLeaderboards() {
         '</tr>';
     }).join('');
     html = lbShell(['#', 'Program', 'Projects', 'Total MW', 'Avg MW', 'High Opp %'], rows, ['center', 'left', 'right', 'right', 'right', 'right']);
+  } else if (currentLB === 'pipeline') {
+    // Funnel stages in lifecycle order (exclude Unknown from main funnel)
+    const FUNNEL_STAGES = ['Proposed','Pending','Approved','Under Construction','Operational'];
+    const LOSS_STAGES = ['Denied','Cancelled'];
+    const totalN = PROJECTS.length;
+    const funnelData = FUNNEL_STAGES.map(s => MSR_MAP[s]);
+    const lossData = LOSS_STAGES.map(s => MSR_MAP[s]);
+    const maxN = Math.max(...funnelData.map(e => e.projects.length), 1);
+
+    let funnelHtml = '<div style="padding:4px 0 20px;">' +
+      '<div style="font-size:13px;color:#64748b;margin-bottom:14px;">Project pipeline by MSR (Municipal Support Resolution) stage — ' + totalN + ' total projects</div>' +
+      '<div style="display:flex;flex-direction:column;gap:8px;">';
+
+    funnelData.forEach((e, i) => {
+      const c = MSR_COLORS[e.stage];
+      const pct = Math.round(e.projects.length / maxN * 100);
+      const prev = i > 0 ? funnelData[i-1].projects.length : null;
+      const conv = prev && prev > 0 ? Math.round(e.projects.length / prev * 100) : null;
+      funnelHtml += '<div style="cursor:pointer;" onclick="setMSRFilter(\'' + e.stage + '\')" onmouseover="this.querySelector(\'.funnel-bar\').style.opacity=\'0.85\'" onmouseout="this.querySelector(\'.funnel-bar\').style.opacity=\'1\'">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">' +
+        '<div style="min-width:130px;font-size:13px;font-weight:700;color:' + c.text + ';background:' + c.bg + ';padding:3px 9px;border-radius:10px;text-align:center;">' + e.stage + '</div>' +
+        '<div style="font-size:15px;font-weight:800;color:#0f172a;min-width:40px;">' + e.projects.length + '</div>' +
+        '<div style="font-size:13px;color:#64748b;min-width:80px;">' + Math.round(e.totalMW) + ' MW</div>' +
+        (conv !== null ? '<div style="font-size:11px;font-weight:600;color:' + (conv >= 50 ? '#22c55e' : conv >= 25 ? '#eab308' : '#ef4444') + ';">&#8593; ' + conv + '% of prev</div>' : '') +
+        '</div>' +
+        '<div class="funnel-bar" style="height:22px;width:' + Math.max(pct, 2) + '%;background:' + c.bar + ';border-radius:0 6px 6px 0;transition:width 0.3s;opacity:1;position:relative;">' +
+        (e.projects.length > 0 ? '<span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:white;white-space:nowrap;">' + e.projects.length + ' projects</span>' : '') +
+        '</div>' +
+        '</div>';
+    });
+
+    funnelHtml += '</div>';
+
+    // Loss rows
+    if (lossData.some(e => e.projects.length > 0)) {
+      funnelHtml += '<div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:14px;">' +
+        '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">Pipeline Losses</div>' +
+        '<div style="display:flex;gap:12px;flex-wrap:wrap;">';
+      lossData.forEach(e => {
+        if (!e.projects.length) return;
+        const c = MSR_COLORS[e.stage];
+        funnelHtml += '<div onclick="setMSRFilter(\'' + e.stage + '\')" style="background:' + c.bg + ';border:1px solid ' + c.bar + '40;border-radius:10px;padding:10px 14px;cursor:pointer;min-width:140px;" onmouseover="this.style.opacity=\'0.85\'" onmouseout="this.style.opacity=\'1\'">' +
+          '<div style="font-size:13px;font-weight:700;color:' + c.text + ';margin-bottom:3px;">' + e.stage + '</div>' +
+          '<div style="font-size:18px;font-weight:800;color:#0f172a;">' + e.projects.length + '</div>' +
+          '<div style="font-size:12px;color:#64748b;">' + Math.round(e.totalMW) + ' MW</div>' +
+          '</div>';
+      });
+      funnelHtml += '</div></div>';
+    }
+
+    funnelHtml += '</div>';
+    html = funnelHtml;
   }
 
+  
   const contentEl = document.getElementById('lbContent');
   if (contentEl) contentEl.innerHTML = html;
 }
