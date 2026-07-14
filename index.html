@@ -9,33 +9,34 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin:0; padding:0; overflow:hidden; height:100vh; display:flex; flex-direction:column; background:#f1f5f9; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin:0; padding:0; overflow:hidden; height:100vh; display:flex; flex-direction:column; background:#f1f5f9; font-size:16px; }
 #map { height:100%; width:100%; }
 .leaflet-popup-content-wrapper { border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,0.15); }
-.badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-size:13px; font-weight:600; letter-spacing:0.03em; white-space:nowrap; }
+.badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-size:14px; font-weight:600; letter-spacing:0.03em; white-space:nowrap; }
 .project-row:hover { background:#f0f9ff; cursor:pointer; }
 .card-hover { transition:all 0.2s; cursor:pointer; }
 .card-hover:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.1); }
 .scrollable { overflow-y:auto; max-height:320px; }
-.filter-label { font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; margin-bottom:8px; }
+.filter-label { font-size:14px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; margin-bottom:8px; }
 .filter-section { border-bottom:1px solid #1e293b; padding-bottom:16px; margin-bottom:16px; }
-.checkbox-item { display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer; font-size:15px; color:#cbd5e1; }
+.checkbox-item { display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer; font-size:16px; color:#cbd5e1; }
 .checkbox-item:hover { color:white; }
-.checkbox-item input[type=checkbox] { accent-color:#3b82f6; width:14px; height:14px; }
-select.filter-select { background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:6px 10px; font-size:15px; width:100%; outline:none; }
+.checkbox-item input[type=checkbox] { accent-color:#3b82f6; width:15px; height:15px; }
+select.filter-select { background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:6px 10px; font-size:16px; width:100%; outline:none; }
 select.filter-select:focus { border-color:#3b82f6; }
-input.filter-input { background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:6px 10px; font-size:15px; outline:none; }
+input.filter-input { background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:6px 10px; font-size:16px; outline:none; }
 input.filter-input:focus { border-color:#3b82f6; }
 input.filter-input::placeholder { color:#475569; }
-.nav-link { padding:8px 14px; font-size:15px; font-weight:500; color:#94a3b8; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; white-space:nowrap; }
+.nav-link { padding:8px 14px; font-size:16px; font-weight:500; color:#94a3b8; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; white-space:nowrap; }
 .nav-link.active { color:white; border-bottom-color:#3b82f6; }
 .nav-link:hover:not(.active) { color:#cbd5e1; }
-#profilePanel { position:fixed; top:0; right:0; height:100%; width:480px; max-width:95vw; background:white; z-index:9999; overflow-y:auto; box-shadow:-8px 0 40px rgba(0,0,0,0.2); transform:translateX(100%); transition:transform 0.3s ease; }
+#profilePanel { position:fixed; top:0; right:0; height:100%; width:620px; max-width:95vw; background:white; z-index:9999; overflow-y:auto; box-shadow:-8px 0 40px rgba(0,0,0,0.2); transform:translateX(100%); transition:transform 0.3s ease; }
 #profilePanel.open { transform:translateX(0); }
+#profilePanel.has-back .profile-sticky-header { top:46px !important; }
 .profile-backdrop { position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:9998; display:none; }
 .profile-metric { background:#f8fafc; border-radius:10px; padding:14px 16px; text-align:center; }
-.profile-metric .val { font-size:24px; font-weight:700; color:#0f172a; }
-.profile-metric .lbl { font-size:13px; color:#64748b; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; margin-top:2px; }
+.profile-metric .val { font-size:28px; font-weight:700; color:#0f172a; }
+.profile-metric .lbl { font-size:14px; color:#64748b; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; margin-top:2px; }
 .entity-row { padding:10px 14px; border-bottom:1px solid #f1f5f9; cursor:pointer; display:flex; align-items:center; justify-content:space-between; transition:background 0.1s; }
 .entity-row:hover { background:#f0f9ff; }
 ::-webkit-scrollbar { width:6px; }
@@ -863,11 +864,11 @@ function renderProjects() {
 
   document.getElementById('projectsBody').innerHTML = slice.map(p =>
     '<tr class="project-row" onclick="openProject(' + p.id + ')" style="border-bottom:1px solid #f1f5f9;">' +
-    '<td style="padding:9px 14px;font-size:13px;font-weight:500;color:#0f172a;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.project_name||'—') + '</td>' +
-    '<td style="padding:9px 14px;font-size:13px;color:#475569;white-space:nowrap;">' + esc(p.municipality||'—') + '</td>' +
-    '<td style="padding:9px 14px;font-size:13px;color:#475569;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.developer||'—') + '</td>' +
+    '<td style="padding:9px 14px;font-size:15px;font-weight:500;color:#0f172a;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.project_name||'—') + '</td>' +
+    '<td style="padding:9px 14px;font-size:15px;color:#475569;white-space:nowrap;">' + esc(p.municipality||'—') + '</td>' +
+    '<td style="padding:9px 14px;font-size:15px;color:#475569;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(p.developer||'—') + '</td>' +
     '<td style="padding:9px 14px;">' + techBadge(p._tech) + '</td>' +
-    '<td style="padding:9px 14px;text-align:right;font-size:13px;font-weight:600;color:#0f172a;">' + (p._mw > 0 ? p._mw.toFixed(1) : '—') + '</td>' +
+    '<td style="padding:9px 14px;text-align:right;font-size:15px;font-weight:600;color:#0f172a;">' + (p._mw > 0 ? p._mw.toFixed(1) : '—') + '</td>' +
     '<td style="padding:9px 14px;">' + statusBadge(p.status) + '</td>' +
     '<td style="padding:9px 14px;">' + oppBadge(p._opp) + '</td>' +
     '</tr>'
@@ -893,13 +894,13 @@ function renderDevs() {
     const tc = top ? (TECH_COLORS[top[0]]||'#6b7280') : '#6b7280';
     return '<div class="card-hover" onclick="openDev(\'' + esc(d.name).replace(/'/g,"&#39;") + '\')" style="background:white;border-radius:12px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f1f5f9;">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">' +
-      '<div style="font-size:13px;font-weight:700;color:#0f172a;line-height:1.3;flex:1;padding-right:8px;">' + esc(d.name) + '</div>' +
-      (top ? '<span style="background:' + tc + '15;color:' + tc + ';font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;">' + top[0] + '</span>' : '') +
+      '<div style="font-size:15px;font-weight:700;color:#0f172a;line-height:1.3;flex:1;padding-right:8px;">' + esc(d.name) + '</div>' +
+      (top ? '<span style="background:' + tc + '15;color:' + tc + ';font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;">' + top[0] + '</span>' : '') +
       '</div>' +
       '<div style="display:flex;gap:14px;">' +
-      '<div><div style="font-size:17px;font-weight:800;color:#0f172a;">' + fmtN(d.projects.length) + '</div><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Projects</div></div>' +
-      '<div><div style="font-size:17px;font-weight:800;color:#3b82f6;">' + (d.totalMW > 0 ? Math.round(d.totalMW) : '—') + '</div><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">MW</div></div>' +
-      '<div><div style="font-size:17px;font-weight:800;color:#8b5cf6;">' + fmtN(d.munis.size) + '</div><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Munis</div></div>' +
+      '<div><div style="font-size:19px;font-weight:800;color:#0f172a;">' + fmtN(d.projects.length) + '</div><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Projects</div></div>' +
+      '<div><div style="font-size:19px;font-weight:800;color:#3b82f6;">' + (d.totalMW > 0 ? Math.round(d.totalMW) : '—') + '</div><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">MW</div></div>' +
+      '<div><div style="font-size:19px;font-weight:800;color:#8b5cf6;">' + fmtN(d.munis.size) + '</div><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Munis</div></div>' +
       '</div></div>';
   }).join('');
 }
@@ -919,14 +920,14 @@ function renderMunis() {
     const barColor = oppPct > 50 ? '#ef4444' : oppPct > 25 ? '#f97316' : '#22c55e';
     return '<div class="card-hover" onclick="openMuni(\'' + esc(m.name).replace(/'/g,"&#39;") + '\')" style="background:white;border-radius:12px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f1f5f9;">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">' +
-      '<div style="font-size:13px;font-weight:700;color:#0f172a;line-height:1.3;flex:1;padding-right:8px;">' + esc(m.name) + '</div>' +
-      (top ? '<span style="background:' + tc + '15;color:' + tc + ';font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;">' + top[0] + '</span>' : '') +
+      '<div style="font-size:15px;font-weight:700;color:#0f172a;line-height:1.3;flex:1;padding-right:8px;">' + esc(m.name) + '</div>' +
+      (top ? '<span style="background:' + tc + '15;color:' + tc + ';font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;">' + top[0] + '</span>' : '') +
       '</div>' +
       '<div style="display:flex;gap:14px;margin-bottom:10px;">' +
-      '<div><div style="font-size:17px;font-weight:800;color:#0f172a;">' + fmtN(m.projects.length) + '</div><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Projects</div></div>' +
-      '<div><div style="font-size:17px;font-weight:800;color:#3b82f6;">' + (m.totalMW > 0 ? Math.round(m.totalMW) : '—') + '</div><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">MW</div></div>' +
+      '<div><div style="font-size:19px;font-weight:800;color:#0f172a;">' + fmtN(m.projects.length) + '</div><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Projects</div></div>' +
+      '<div><div style="font-size:19px;font-weight:800;color:#3b82f6;">' + (m.totalMW > 0 ? Math.round(m.totalMW) : '—') + '</div><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">MW</div></div>' +
       '</div>' +
-      '<div><div style="display:flex;justify-content:space-between;font-size:10px;color:#64748b;margin-bottom:3px;"><span>High/Very High Opposition</span><span style="color:' + barColor + ';font-weight:700;">' + oppPct + '%</span></div>' +
+      '<div><div style="display:flex;justify-content:space-between;font-size:12px;color:#64748b;margin-bottom:3px;"><span>High/Very High Opposition</span><span style="color:' + barColor + ';font-weight:700;">' + oppPct + '%</span></div>' +
       '<div style="height:5px;background:#f1f5f9;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + oppPct + '%;background:' + barColor + ';border-radius:3px;"></div></div></div>' +
       '</div>';
   }).join('');
@@ -944,10 +945,10 @@ function renderDocs() {
     const ext = parts.length > 1 ? parts[parts.length-1].toUpperCase() : 'FILE';
     const ec = ext === 'PDF' ? '#ef4444' : ext === 'DOC' || ext === 'DOCX' ? '#3b82f6' : ext === 'XLS' || ext === 'XLSX' ? '#22c55e' : '#6b7280';
     return '<tr style="border-bottom:1px solid #f1f5f9;">' +
-      '<td style="padding:9px 14px;font-size:12px;color:#374151;">' + esc(d.filename) + '</td>' +
+      '<td style="padding:9px 14px;font-size:15px;color:#374151;">' + esc(d.filename) + '</td>' +
       '<td style="padding:9px 14px;"><span class="badge" style="background:' + ec + '15;color:' + ec + ';">' + ext + '</span></td>' +
-      '<td style="padding:9px 14px;"><span style="color:#3b82f6;cursor:pointer;font-size:12px;font-weight:500;" onclick="openProject(' + d.project.id + ')">' + esc(d.project.project_name||'—') + '</span></td>' +
-      '<td style="padding:9px 14px;font-size:12px;color:#475569;">' + esc(d.project.municipality||'—') + '</td>' +
+      '<td style="padding:9px 14px;"><span style="color:#3b82f6;cursor:pointer;font-size:15px;font-weight:500;" onclick="openProject(' + d.project.id + ')">' + esc(d.project.project_name||'—') + '</span></td>' +
+      '<td style="padding:9px 14px;font-size:15px;color:#475569;">' + esc(d.project.municipality||'—') + '</td>' +
       '</tr>';
   }).join('');
 }
@@ -976,8 +977,8 @@ function initMap() {
 
     m.bindPopup(
       '<div style="min-width:210px;font-family:-apple-system,sans-serif;">' +
-      '<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;line-height:1.3;">' + esc(p.project_name||'—') + '</div>' +
-      '<div style="font-size:11px;color:#64748b;margin-bottom:8px;">' + esc(p.municipality||'—') + ' · ' + esc(p.developer||'—') + '</div>' +
+      '<div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:4px;line-height:1.3;">' + esc(p.project_name||'—') + '</div>' +
+      '<div style="font-size:13px;color:#64748b;margin-bottom:8px;">' + esc(p.municipality||'—') + ' · ' + esc(p.developer||'—') + '</div>' +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">' +
       '<span style="background:' + color + '20;color:' + color + ';font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">' + p._tech + '</span>' +
       (p._mw > 0 ? '<span style="background:#dbeafe;color:#1e3a8a;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">' + p._mw.toFixed(1) + ' MW</span>' : '') +
@@ -1005,15 +1006,54 @@ function updateMarkers() {
 // ================================================================
 // PROFILE PANEL
 // ================================================================
+const panelHistory = [];
+
+function backButtonHtml(show) {
+  if (!show) return '';
+  return '<div onclick="goBack()" style="display:flex;align-items:center;gap:8px;padding:10px 16px 10px;background:#f0f9ff;border-bottom:2px solid #bfdbfe;cursor:pointer;min-height:44px;position:sticky;top:0;z-index:10002;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f0f9ff\'">' +
+    '<span style="font-size:22px;color:#2563eb;line-height:1;">&#8592;</span>' +
+    '<span style="font-size:15px;font-weight:700;color:#2563eb;">Back</span>' +
+    '</div>';
+}
+
 function openPanel(html) {
-  document.getElementById('profileContent').innerHTML = html;
-  document.getElementById('profilePanel').classList.add('open');
+  const panel = document.getElementById('profilePanel');
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) {
+    // Navigate forward — save current raw html (without the back button strip)
+    panelHistory.push(document.getElementById('profileContent').getAttribute('data-raw') || document.getElementById('profileContent').innerHTML);
+  } else {
+    panelHistory.length = 0;
+  }
+  const rawHtml = html;
+  const showBack = panelHistory.length > 0;
+  const fullHtml = backButtonHtml(showBack) + rawHtml;
+  const content = document.getElementById('profileContent');
+  content.setAttribute('data-raw', rawHtml);
+  content.innerHTML = fullHtml;
+  panel.classList.add('open');
+  panel.classList.toggle('has-back', showBack);
   document.getElementById('profileBackdrop').style.display = 'block';
+  panel.scrollTop = 0;
+}
+
+function goBack() {
+  if (panelHistory.length === 0) { closePanel(); return; }
+  const prev = panelHistory.pop();
+  const showBack = panelHistory.length > 0;
+  const content = document.getElementById('profileContent');
+  const fullHtml = backButtonHtml(showBack) + prev;
+  content.setAttribute('data-raw', prev);
+  content.innerHTML = fullHtml;
+  const panel = document.getElementById('profilePanel');
+  panel.classList.toggle('has-back', showBack);
+  panel.scrollTop = 0;
 }
 
 function closePanel() {
   document.getElementById('profilePanel').classList.remove('open');
   document.getElementById('profileBackdrop').style.display = 'none';
+  panelHistory.length = 0;
 }
 
 // ================================================================
@@ -1029,10 +1069,10 @@ function openProject(id) {
   const dev = DEV_MAP[p.developer];
   const muni = MUNI_MAP[p.municipality];
 
-  let html = '<div style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:20px 20px 16px;position:sticky;top:0;z-index:10;">' +
+  let html = '<div class="profile-sticky-header" style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:20px 20px 16px;position:sticky;top:0;z-index:10;">' +
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;">' +
-    '<div style="font-size:17px;font-weight:800;color:white;line-height:1.3;flex:1;padding-right:12px;">' + esc(p.project_name||'Unknown') + '</div>' +
-    '<button onclick="closePanel()" style="background:#334155;color:#94a3b8;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-size:12px;white-space:nowrap;">&#x2715; Close</button>' +
+    '<div style="font-size:19px;font-weight:800;color:white;line-height:1.3;flex:1;padding-right:12px;">' + esc(p.project_name||'Unknown') + '</div>' +
+    '<button onclick="closePanel()" style="background:#334155;color:#94a3b8;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-size:14px;white-space:nowrap;">&#x2715; Close</button>' +
     '</div>' +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
     '<span style="background:' + tc + '30;color:' + (tc === '#eab308' ? '#ca8a04' : tc) + ';border:1px solid ' + tc + '50;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;">' + p._tech + '</span>' +
@@ -1054,55 +1094,55 @@ function openProject(id) {
   // Notes
   if (p.notes) {
     html += '<div style="margin-bottom:16px;">' +
-      '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Notes</div>' +
-      '<div style="font-size:12px;color:#374151;line-height:1.6;background:#f8fafc;border-radius:8px;padding:10px 12px;max-height:130px;overflow-y:auto;">' + esc(p.notes) + '</div>' +
+      '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Notes</div>' +
+      '<div style="font-size:15px;color:#374151;line-height:1.6;background:#f8fafc;border-radius:8px;padding:10px 12px;max-height:130px;overflow-y:auto;">' + esc(p.notes) + '</div>' +
       '</div>';
   }
 
   // Key issues
   if (issues.length) {
     html += '<div style="margin-bottom:16px;">' +
-      '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Key Issues</div>' +
+      '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Key Issues</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
-      issues.map(ki => '<span style="background:#fef3c7;color:#92400e;font-size:11px;padding:2px 9px;border-radius:20px;">' + esc(ki) + '</span>').join('') +
+      issues.map(ki => '<span style="background:#fef3c7;color:#92400e;font-size:13px;padding:2px 9px;border-radius:20px;">' + esc(ki) + '</span>').join('') +
       '</div></div>';
   }
 
   // Address & source
   if (p.address_location) {
     html += '<div style="margin-bottom:14px;">' +
-      '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Address</div>' +
-      '<div style="font-size:12px;color:#374151;">' + esc(p.address_location) + '</div></div>';
+      '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Address</div>' +
+      '<div style="font-size:15px;color:#374151;">' + esc(p.address_location) + '</div></div>';
   }
   if (p.source_url) {
     html += '<div style="margin-bottom:14px;">' +
-      '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Source</div>' +
-      '<a href="' + esc(p.source_url) + '" target="_blank" rel="noopener" style="font-size:12px;color:#3b82f6;word-break:break-all;">' + esc(p.source_url.length > 65 ? p.source_url.slice(0,65)+'…' : p.source_url) + '</a></div>';
+      '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Source</div>' +
+      '<a href="' + esc(p.source_url) + '" target="_blank" rel="noopener" style="font-size:14px;color:#3b82f6;word-break:break-all;">' + esc(p.source_url.length > 65 ? p.source_url.slice(0,65)+'…' : p.source_url) + '</a></div>';
   }
 
   // Related entities
   html += '<div style="border-top:1px solid #f1f5f9;padding-top:16px;margin-bottom:0;">' +
-    '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Related Entities</div>';
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Related Entities</div>';
 
   if (p.developer) {
     html += '<div onclick="openDev(\'' + esc(p.developer).replace(/'/g,"&#39;") + '\')" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onmouseover="this.style.background=\'#f0f9ff\'" onmouseout="this.style.background=\'#f8fafc\'">' +
-      '<div><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Developer</div>' +
-      '<div style="font-size:13px;font-weight:600;color:#0f172a;">' + esc(p.developer) + '</div>' +
-      (dev ? '<div style="font-size:11px;color:#64748b;">' + fmtN(dev.projects.length) + ' projects · ' + Math.round(dev.totalMW) + ' MW</div>' : '') +
+      '<div><div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Developer</div>' +
+      '<div style="font-size:15px;font-weight:600;color:#0f172a;">' + esc(p.developer) + '</div>' +
+      (dev ? '<div style="font-size:13px;color:#64748b;">' + fmtN(dev.projects.length) + ' projects · ' + Math.round(dev.totalMW) + ' MW</div>' : '') +
       '</div><span style="color:#94a3b8;font-size:20px;">&#8250;</span></div>';
   }
 
   if (p.municipality) {
     html += '<div onclick="openMuni(\'' + esc(p.municipality).replace(/'/g,"&#39;") + '\')" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onmouseover="this.style.background=\'#f0f9ff\'" onmouseout="this.style.background=\'#f8fafc\'">' +
-      '<div><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Municipality</div>' +
-      '<div style="font-size:13px;font-weight:600;color:#0f172a;">' + esc(p.municipality) + '</div>' +
-      (muni ? '<div style="font-size:11px;color:#64748b;">' + fmtN(muni.projects.length) + ' projects · ' + Math.round(muni.totalMW) + ' MW</div>' : '') +
+      '<div><div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Municipality</div>' +
+      '<div style="font-size:15px;font-weight:600;color:#0f172a;">' + esc(p.municipality) + '</div>' +
+      (muni ? '<div style="font-size:13px;color:#64748b;">' + fmtN(muni.projects.length) + ' projects · ' + Math.round(muni.totalMW) + ' MW</div>' : '') +
       '</div><span style="color:#94a3b8;font-size:20px;">&#8250;</span></div>';
   }
 
   if (p._docs.length) {
     html += '<div style="margin-top:10px;">' +
-      '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Documents (' + p._docs.length + ')</div>' +
+      '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Documents (' + p._docs.length + ')</div>' +
       p._docs.map(fn => {
         const ext = fn.split('.').pop().toUpperCase();
         const ec = ext === 'PDF' ? '#ef4444' : '#3b82f6';
@@ -1126,12 +1166,12 @@ function openDev(name) {
   const maxT = techEntries[0] ? techEntries[0][1] : 1;
   const avgMW = d.projects.length > 0 ? (d.totalMW / d.projects.length).toFixed(1) : '—';
 
-  let html = '<div style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:20px 20px 16px;position:sticky;top:0;z-index:10;">' +
+  let html = '<div class="profile-sticky-header" style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:20px 20px 16px;position:sticky;top:0;z-index:10;">' +
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">' +
-    '<div style="font-size:16px;font-weight:800;color:white;line-height:1.3;flex:1;padding-right:12px;">' + esc(name) + '</div>' +
-    '<button onclick="closePanel()" style="background:#334155;color:#94a3b8;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-size:12px;">&#x2715; Close</button>' +
+    '<div style="font-size:19px;font-weight:800;color:white;line-height:1.3;flex:1;padding-right:12px;">' + esc(name) + '</div>' +
+    '<button onclick="closePanel()" style="background:#334155;color:#94a3b8;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-size:14px;">&#x2715; Close</button>' +
     '</div>' +
-    '<div style="font-size:12px;color:#94a3b8;">' + fmtN(d.projects.length) + ' Projects &middot; ' + Math.round(d.totalMW) + ' MW &middot; ' + fmtN(d.munis.size) + ' Municipalities</div>' +
+    '<div style="font-size:14px;color:#94a3b8;">' + fmtN(d.projects.length) + ' Projects &middot; ' + Math.round(d.totalMW) + ' MW &middot; ' + fmtN(d.munis.size) + ' Municipalities</div>' +
     '</div>';
 
   html += '<div style="padding:18px 20px;">';
@@ -1144,32 +1184,32 @@ function openDev(name) {
     '</div>';
 
   html += '<div style="margin-bottom:18px;">' +
-    '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Technology Mix</div>' +
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Technology Mix</div>' +
     techEntries.map(([t, cnt]) => {
       const tc = TECH_COLORS[t]||'#6b7280';
       const pct = Math.round(cnt/d.projects.length*100);
       return '<div style="margin-bottom:7px;">' +
-        '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;"><span style="color:#374151;font-weight:500;">' + t + '</span><span style="color:#64748b;">' + cnt + ' (' + pct + '%)</span></div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;"><span style="color:#374151;font-weight:500;">' + t + '</span><span style="color:#64748b;">' + cnt + ' (' + pct + '%)</span></div>' +
         '<div style="height:7px;background:#f1f5f9;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + Math.round(cnt/maxT*100) + '%;background:' + tc + ';border-radius:3px;"></div></div>' +
         '</div>';
     }).join('') + '</div>';
 
   html += '<div style="margin-bottom:18px;">' +
-    '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Projects (' + fmtN(d.projects.length) + ')</div>' +
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Projects (' + fmtN(d.projects.length) + ')</div>' +
     '<div class="scrollable" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">' +
     d.projects.slice(0,50).map(p => {
       const tc = TECH_COLORS[p._tech]||'#6b7280';
       return '<div class="entity-row" onclick="openProject(' + p.id + ')">' +
-        '<div><div style="font-size:12px;font-weight:600;color:#0f172a;">' + esc(p.project_name||'—') + '</div>' +
-        '<div style="font-size:11px;color:#64748b;">' + esc(p.municipality||'—') + '</div></div>' +
-        '<div style="text-align:right;"><div style="font-size:12px;font-weight:600;color:#3b82f6;">' + (p._mw>0?p._mw.toFixed(1)+' MW':'—') + '</div>' +
-        '<span style="background:' + tc + '15;color:' + tc + ';font-size:10px;font-weight:600;padding:1px 5px;border-radius:8px;">' + p._tech + '</span></div>' +
+        '<div><div style="font-size:14px;font-weight:600;color:#0f172a;">' + esc(p.project_name||'—') + '</div>' +
+        '<div style="font-size:13px;color:#64748b;">' + esc(p.municipality||'—') + '</div></div>' +
+        '<div style="text-align:right;"><div style="font-size:14px;font-weight:600;color:#3b82f6;">' + (p._mw>0?p._mw.toFixed(1)+' MW':'—') + '</div>' +
+        '<span style="background:' + tc + '15;color:' + tc + ';font-size:12px;font-weight:600;padding:1px 5px;border-radius:8px;">' + p._tech + '</span></div>' +
         '</div>';
     }).join('') +
-    (d.projects.length > 50 ? '<div style="padding:9px 13px;font-size:11px;color:#94a3b8;text-align:center;">+' + (d.projects.length-50) + ' more</div>' : '') +
+    (d.projects.length > 50 ? '<div style="padding:9px 13px;font-size:13px;color:#94a3b8;text-align:center;">+' + (d.projects.length-50) + ' more</div>' : '') +
     '</div></div>';
 
-  html += '<div><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Municipalities (' + fmtN(d.munis.size) + ')</div>' +
+  html += '<div><div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Municipalities (' + fmtN(d.munis.size) + ')</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
     [...d.munis].slice(0,30).map(m => '<span onclick="openMuni(\'' + esc(m).replace(/'/g,"&#39;") + '\')" style="background:#f1f5f9;color:#374151;font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;cursor:pointer;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f1f5f9\'">' + esc(m) + '</span>').join('') +
     (d.munis.size > 30 ? '<span style="background:#f8fafc;color:#94a3b8;font-size:11px;padding:3px 9px;border-radius:20px;">+' + (d.munis.size-30) + ' more</span>' : '') +
@@ -1193,12 +1233,12 @@ function openMuni(name) {
   m.issues.forEach(ki => { issueCnt[ki] = (issueCnt[ki]||0)+1; });
   const topIssues = Object.entries(issueCnt).sort((a,b) => b[1]-a[1]).slice(0,15);
 
-  let html = '<div style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:20px 20px 16px;position:sticky;top:0;z-index:10;">' +
+  let html = '<div class="profile-sticky-header" style="background:linear-gradient(135deg,#0f172a,#1e293b);padding:20px 20px 16px;position:sticky;top:0;z-index:10;">' +
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;">' +
-    '<div style="font-size:16px;font-weight:800;color:white;line-height:1.3;flex:1;padding-right:12px;">' + esc(name) + '</div>' +
-    '<button onclick="closePanel()" style="background:#334155;color:#94a3b8;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-size:12px;">&#x2715; Close</button>' +
+    '<div style="font-size:19px;font-weight:800;color:white;line-height:1.3;flex:1;padding-right:12px;">' + esc(name) + '</div>' +
+    '<button onclick="closePanel()" style="background:#334155;color:#94a3b8;border:none;border-radius:7px;padding:5px 11px;cursor:pointer;font-size:14px;">&#x2715; Close</button>' +
     '</div>' +
-    '<div style="font-size:12px;color:#94a3b8;">' + fmtN(m.projects.length) + ' Projects &middot; ' + Math.round(m.totalMW) + ' MW Total</div>' +
+    '<div style="font-size:14px;color:#94a3b8;">' + fmtN(m.projects.length) + ' Projects &middot; ' + Math.round(m.totalMW) + ' MW Total</div>' +
     '</div>';
 
   html += '<div style="padding:18px 20px;">';
@@ -1211,61 +1251,61 @@ function openMuni(name) {
     '</div>';
 
   html += '<div style="margin-bottom:18px;">' +
-    '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Opposition Breakdown</div>' +
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Opposition Breakdown</div>' +
     ['Low','Moderate','High','Very High','Unknown'].map(lvl => {
       const c = OPP[lvl];
       const cnt = m.oppCounts[lvl] || 0;
       const pct = m.projects.length > 0 ? Math.round(cnt/m.projects.length*100) : 0;
       return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
-        '<span style="background:' + c.bg + ';color:' + c.text + ';font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:64px;text-align:center;">' + lvl + '</span>' +
+        '<span style="background:' + c.bg + ';color:' + c.text + ';font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:64px;text-align:center;">' + lvl + '</span>' +
         '<div style="flex:1;height:7px;background:#f1f5f9;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + c.bar + ';border-radius:3px;opacity:0.8;"></div></div>' +
-        '<span style="font-size:11px;color:#64748b;min-width:32px;text-align:right;">' + cnt + '</span>' +
+        '<span style="font-size:13px;color:#64748b;min-width:32px;text-align:right;">' + cnt + '</span>' +
         '</div>';
     }).join('') + '</div>';
 
   if (topIssues.length) {
     html += '<div style="margin-bottom:18px;">' +
-      '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Key Issues</div>' +
+      '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Key Issues</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
-      topIssues.map(([ki,cnt]) => '<span style="background:#fef3c7;color:#92400e;font-size:11px;padding:2px 9px;border-radius:20px;">' + esc(ki) + (cnt>1?' ('+cnt+')':'') + '</span>').join('') +
+      topIssues.map(([ki,cnt]) => '<span style="background:#fef3c7;color:#92400e;font-size:13px;padding:2px 9px;border-radius:20px;">' + esc(ki) + (cnt>1?' ('+cnt+')':'') + '</span>').join('') +
       '</div></div>';
   }
 
   html += '<div style="margin-bottom:18px;">' +
-    '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Technology Mix</div>' +
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Technology Mix</div>' +
     techEntries.map(([t,cnt]) => {
       const tc = TECH_COLORS[t]||'#6b7280';
       const pct = Math.round(cnt/m.projects.length*100);
       return '<div style="margin-bottom:7px;">' +
-        '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;"><span style="color:#374151;font-weight:500;">' + t + '</span><span style="color:#64748b;">' + cnt + ' (' + pct + '%)</span></div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;"><span style="color:#374151;font-weight:500;">' + t + '</span><span style="color:#64748b;">' + cnt + ' (' + pct + '%)</span></div>' +
         '<div style="height:7px;background:#f1f5f9;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + Math.round(cnt/maxT*100) + '%;background:' + tc + ';border-radius:3px;"></div></div>' +
         '</div>';
     }).join('') + '</div>';
 
   html += '<div style="margin-bottom:18px;">' +
-    '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Projects (' + fmtN(m.projects.length) + ')</div>' +
+    '<div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Projects (' + fmtN(m.projects.length) + ')</div>' +
     '<div class="scrollable" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">' +
     m.projects.slice(0,50).map(p => {
       const oppC = OPP[p._opp]||OPP['Unknown'];
       return '<div class="entity-row" onclick="openProject(' + p.id + ')">' +
-        '<div><div style="font-size:12px;font-weight:600;color:#0f172a;">' + esc(p.project_name||'—') + '</div>' +
-        '<div style="font-size:11px;color:#64748b;">' + esc(p.developer||'—') + '</div></div>' +
-        '<div style="text-align:right;"><div style="font-size:12px;font-weight:600;color:#3b82f6;">' + (p._mw>0?p._mw.toFixed(1)+' MW':'—') + '</div>' +
-        '<span style="background:' + oppC.bg + ';color:' + oppC.text + ';font-size:10px;font-weight:600;padding:1px 5px;border-radius:8px;">' + p._opp + '</span></div>' +
+        '<div><div style="font-size:14px;font-weight:600;color:#0f172a;">' + esc(p.project_name||'—') + '</div>' +
+        '<div style="font-size:13px;color:#64748b;">' + esc(p.developer||'—') + '</div></div>' +
+        '<div style="text-align:right;"><div style="font-size:14px;font-weight:600;color:#3b82f6;">' + (p._mw>0?p._mw.toFixed(1)+' MW':'—') + '</div>' +
+        '<span style="background:' + oppC.bg + ';color:' + oppC.text + ';font-size:12px;font-weight:600;padding:1px 5px;border-radius:8px;">' + p._opp + '</span></div>' +
         '</div>';
     }).join('') +
-    (m.projects.length > 50 ? '<div style="padding:9px 13px;font-size:11px;color:#94a3b8;text-align:center;">+' + (m.projects.length-50) + ' more</div>' : '') +
+    (m.projects.length > 50 ? '<div style="padding:9px 13px;font-size:13px;color:#94a3b8;text-align:center;">+' + (m.projects.length-50) + ' more</div>' : '') +
     '</div></div>';
 
-  html += '<div style="margin-bottom:18px;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Developers (' + fmtN(m.devs.size) + ')</div>' +
+  html += '<div style="margin-bottom:18px;"><div style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Developers (' + fmtN(m.devs.size) + ')</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
     devList.map(d => '<span onclick="openDev(\'' + esc(d).replace(/'/g,"&#39;") + '\')" style="background:#f1f5f9;color:#374151;font-size:11px;padding:3px 9px;border-radius:20px;cursor:pointer;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f1f5f9\'">' + esc(d) + '</span>').join('') +
     (m.devs.size > 20 ? '<span style="background:#f8fafc;color:#94a3b8;font-size:11px;padding:3px 9px;border-radius:20px;">+' + (m.devs.size-20) + ' more</span>' : '') +
     '</div></div>';
 
   html += '<div style="padding:12px 14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">' +
-    '<div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Council Roster</div>' +
-    '<div style="font-size:12px;color:#94a3b8;font-style:italic;">Council roster ingestion pending &#8212; 0 officials on record</div>' +
+    '<div style="font-size:13px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Council Roster</div>' +
+    '<div style="font-size:14px;color:#94a3b8;font-style:italic;">Council roster ingestion pending &#8212; 0 officials on record</div>' +
     '</div>';
 
   html += '</div>';
