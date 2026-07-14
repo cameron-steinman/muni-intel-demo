@@ -12,35 +12,62 @@
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin:0; padding:0; overflow:hidden; height:100vh; display:flex; flex-direction:column; background:#f1f5f9; }
 #map { height:100%; width:100%; }
 .leaflet-popup-content-wrapper { border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,0.15); }
-.badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-size:11px; font-weight:600; letter-spacing:0.03em; white-space:nowrap; }
+.badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-size:13px; font-weight:600; letter-spacing:0.03em; white-space:nowrap; }
 .project-row:hover { background:#f0f9ff; cursor:pointer; }
 .card-hover { transition:all 0.2s; cursor:pointer; }
 .card-hover:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.1); }
 .scrollable { overflow-y:auto; max-height:320px; }
-.filter-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; margin-bottom:8px; }
+.filter-label { font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8; margin-bottom:8px; }
 .filter-section { border-bottom:1px solid #1e293b; padding-bottom:16px; margin-bottom:16px; }
-.checkbox-item { display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer; font-size:13px; color:#cbd5e1; }
+.checkbox-item { display:flex; align-items:center; gap:8px; padding:4px 0; cursor:pointer; font-size:15px; color:#cbd5e1; }
 .checkbox-item:hover { color:white; }
 .checkbox-item input[type=checkbox] { accent-color:#3b82f6; width:14px; height:14px; }
-select.filter-select { background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:6px 10px; font-size:13px; width:100%; outline:none; }
+select.filter-select { background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:6px 10px; font-size:15px; width:100%; outline:none; }
 select.filter-select:focus { border-color:#3b82f6; }
-input.filter-input { background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:6px 10px; font-size:13px; outline:none; }
+input.filter-input { background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:6px 10px; font-size:15px; outline:none; }
 input.filter-input:focus { border-color:#3b82f6; }
 input.filter-input::placeholder { color:#475569; }
-.nav-link { padding:8px 14px; font-size:13px; font-weight:500; color:#94a3b8; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; white-space:nowrap; }
+.nav-link { padding:8px 14px; font-size:15px; font-weight:500; color:#94a3b8; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.15s; white-space:nowrap; }
 .nav-link.active { color:white; border-bottom-color:#3b82f6; }
 .nav-link:hover:not(.active) { color:#cbd5e1; }
-#profilePanel { position:fixed; top:0; right:0; height:100%; width:480px; max-width:95vw; background:white; z-index:50; overflow-y:auto; box-shadow:-8px 0 40px rgba(0,0,0,0.2); transform:translateX(100%); transition:transform 0.3s ease; }
+#profilePanel { position:fixed; top:0; right:0; height:100%; width:480px; max-width:95vw; background:white; z-index:9999; overflow-y:auto; box-shadow:-8px 0 40px rgba(0,0,0,0.2); transform:translateX(100%); transition:transform 0.3s ease; }
 #profilePanel.open { transform:translateX(0); }
-.profile-backdrop { position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:40; display:none; }
+.profile-backdrop { position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:9998; display:none; }
 .profile-metric { background:#f8fafc; border-radius:10px; padding:14px 16px; text-align:center; }
-.profile-metric .val { font-size:22px; font-weight:700; color:#0f172a; }
-.profile-metric .lbl { font-size:11px; color:#64748b; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; margin-top:2px; }
+.profile-metric .val { font-size:24px; font-weight:700; color:#0f172a; }
+.profile-metric .lbl { font-size:13px; color:#64748b; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; margin-top:2px; }
 .entity-row { padding:10px 14px; border-bottom:1px solid #f1f5f9; cursor:pointer; display:flex; align-items:center; justify-content:space-between; transition:background 0.1s; }
 .entity-row:hover { background:#f0f9ff; }
 ::-webkit-scrollbar { width:6px; }
 ::-webkit-scrollbar-track { background:#f1f5f9; }
 ::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
+@media (max-width: 768px) {
+  body { overflow: auto; height: auto; min-height: 100vh; }
+  /* Sidebar: unstick and go full-width above map */
+  aside { width: 100% !important; flex-shrink: 0; overflow-y: visible !important; padding: 12px 14px !important; }
+  /* Main flex container: column stack (sidebar above, content below) */
+  div[style*="display:flex;flex:1"] { flex-direction: column !important; overflow: visible !important; }
+  /* Map view: stack sidebar above map */
+  #view-map { flex-direction: column !important; overflow: visible !important; }
+  /* Map itself: constrained height on mobile */
+  #map { height: 50vh !important; min-height: 280px; }
+  /* Content views: full width, scrollable */
+  #view-projects, #view-documents, #view-developers, #view-municipalities { overflow: auto !important; }
+  /* Tables: full width, horizontally scrollable */
+  #view-projects > div[style*="overflow:auto"], #view-documents > div[style*="overflow:auto"] { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  /* Profile panel: full-width on mobile */
+  #profilePanel { width: 100% !important; max-width: 100% !important; height: 85vh !important; top: auto !important; bottom: 0 !important; transform: translateY(100%) !important; border-radius: 16px 16px 0 0; }
+  #profilePanel.open { transform: translateY(0) !important; }
+  .profile-backdrop { display: block; }
+  /* Touch-friendly tap targets */
+  .nav-link { padding: 10px 10px !important; font-size: 13px !important; min-height: 44px; display: inline-flex; align-items: center; }
+  button { min-height: 44px; min-width: 44px; }
+  .checkbox-item { min-height: 44px; }
+  /* Metric bar: wrap on very small screens */
+  div[style*="display:flex;gap:12px"] { flex-wrap: wrap; }
+  /* Nav: allow wrapping */
+  nav[style*="display:flex"] { flex-wrap: wrap; }
+}
 </style>
 </head>
 <body>
