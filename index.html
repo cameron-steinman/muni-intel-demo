@@ -85,10 +85,10 @@ input.filter-input::placeholder { color:#475569; }
     <nav style="display:flex;align-items:stretch;gap:0;">
       <span class="nav-link active" onclick="switchTab('map')" id="tab-map">&#128506; Map</span>
       <span class="nav-link" onclick="switchTab('leaderboards')" id="tab-leaderboards">&#127942; Rankings</span>
-      <span class="nav-link" onclick="switchTab('projects')" id="tab-projects">&#128203; Projects</span>
+      <span class="nav-link" onclick="switchTab('projects')" id="tab-projects">&#128203; Active Projects</span>
       <span class="nav-link" onclick="switchTab('developers')" id="tab-developers">&#127959; Developers</span>
       <span class="nav-link" onclick="switchTab('municipalities')" id="tab-municipalities">&#127963; Municipalities</span>
-      <span class="nav-link" onclick="switchTab('documents')" id="tab-documents">&#128196; Documents</span>
+      <span class="nav-link" onclick="switchTab('documents')" id="tab-documents">&#128196; Regulatory Filings</span>
       <span onclick="openSearch()" style="display:flex;align-items:center;padding:0 14px;color:#94a3b8;font-size:13px;font-weight:500;cursor:pointer;gap:6px;border-left:1px solid #1e293b;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#94a3b8'">&#128269; <span style="background:#1e293b;color:#64748b;font-size:11px;font-weight:600;padding:2px 6px;border-radius:5px;border:1px solid #334155;">&#8984;K</span></span>
     </nav>
   </div>
@@ -99,11 +99,11 @@ input.filter-input::placeholder { color:#475569; }
   <div style="display:flex;gap:12px;">
     <div class="metric-card" onclick="switchTab('projects')" title="Browse all projects" style="background:#1e293b;border-radius:8px;padding:10px 16px;flex:1;text-align:center;border:1px solid #334155;">
       <div id="m-projects" style="font-size:20px;font-weight:800;color:#f1f5f9;">846</div>
-      <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Projects</div>
+      <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Active Projects</div>
     </div>
     <div class="metric-card" onclick="sortProjectsByCapacity()" title="Sort projects by capacity (desc)" style="background:#1e293b;border-radius:8px;padding:10px 16px;flex:1;text-align:center;border:1px solid #334155;">
       <div id="m-mw" style="font-size:20px;font-weight:800;color:#3b82f6;">84,794</div>
-      <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Total MW</div>
+      <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Pipeline MW</div>
     </div>
     <div class="metric-card" onclick="switchTab('municipalities')" title="Browse all municipalities" style="background:#1e293b;border-radius:8px;padding:10px 16px;flex:1;text-align:center;border:1px solid #334155;">
       <div id="m-munis" style="font-size:20px;font-weight:800;color:#a78bfa;">372</div>
@@ -115,7 +115,7 @@ input.filter-input::placeholder { color:#475569; }
     </div>
     <div class="metric-card" onclick="switchTab('documents')" title="Browse all documents" style="background:#1e293b;border-radius:8px;padding:10px 16px;flex:1;text-align:center;border:1px solid #334155;">
       <div id="m-docs" style="font-size:20px;font-weight:800;color:#fb923c;">1,119</div>
-      <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Documents</div>
+      <div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Regulatory Filings</div>
     </div>
   </div>
 </div>
@@ -196,7 +196,7 @@ input.filter-input::placeholder { color:#475569; }
     <!-- PROJECTS VIEW -->
     <div id="view-projects" style="flex:1;display:none;flex-direction:column;overflow:hidden;background:white;">
       <div style="padding:16px 20px 12px;border-bottom:1px solid #e2e8f0;flex-shrink:0;">
-        <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0;">Projects <span id="projectsCount" style="font-size:13px;font-weight:400;color:#64748b;"></span></h2>
+        <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0;">Active Projects <span id="projectsCount" style="font-size:13px;font-weight:400;color:#64748b;"></span></h2>
       </div>
       <div style="overflow:auto;flex:1;">
         <table style="width:100%;border-collapse:collapse;">
@@ -208,7 +208,7 @@ input.filter-input::placeholder { color:#475569; }
               <th onclick="sortBy('technology')" style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;user-select:none;" id="sh-technology">Technology <span id="sa-technology"></span></th>
               <th onclick="sortBy('_mw')" style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;user-select:none;" id="sh-_mw">MW <span id="sa-_mw"></span></th>
               <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Status</th>
-              <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Opposition</th>
+              <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Interveners</th>
             </tr>
           </thead>
           <tbody id="projectsBody"></tbody>
@@ -236,7 +236,7 @@ input.filter-input::placeholder { color:#475569; }
     <!-- DOCUMENTS VIEW -->
     <div id="view-documents" style="flex:1;display:none;flex-direction:column;overflow:hidden;background:white;">
       <div style="padding:16px 20px 12px;border-bottom:1px solid #e2e8f0;flex-shrink:0;">
-        <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0;">Documents <span id="docsCount" style="font-size:13px;font-weight:400;color:#64748b;"></span></h2>
+        <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0;">Regulatory Filings <span id="docsCount" style="font-size:13px;font-weight:400;color:#64748b;"></span></h2>
       </div>
       <div style="overflow:auto;flex:1;">
         <table style="width:100%;border-collapse:collapse;">
@@ -1078,7 +1078,7 @@ function renderBreadcrumbs() {
   });
 
   const status = document.getElementById('statusFilter').value;
-  if (status) crumbs.push(pill('Status: ' + status.replace(/_/g,' '),
+  if (status) crumbs.push(pill('Status: ' + (status === 'Approved' ? 'IRP-Approved' : status.replace(/_/g,' ')),
     "document.getElementById('statusFilter').value='';applyFilters()", null, '#dcfce7'));
 
   const activeOpps = Array.from(document.querySelectorAll('.opp-toggle.active')).map(b => b.dataset.opp);
@@ -1785,10 +1785,10 @@ function openProject(id) {
 
   // Metric grid
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">' +
-    '<div class="profile-metric"><div class="val">' + (p._mw > 0 ? p._mw.toFixed(1) : '—') + '</div><div class="lbl">Capacity MW</div></div>' +
+    '<div class="profile-metric"><div class="val">' + (p._mw > 0 ? p._mw.toFixed(1) : '—') + '</div><div class="lbl">Nameplate Capacity (MW)</div></div>' +
     '<div class="profile-metric" onclick="openProcure(\'' + esc(p.ieso_procurement||'').replace(/'/g,"\\'") + '\')" style="cursor:pointer;" title="Click for program details" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'\'"><div class="val" style="font-size:14px;color:#2563eb;">' + esc(p.ieso_procurement||'—') + '</div><div class="lbl">IESO Procurement ↗</div></div>' +
-    '<div class="profile-metric"><div class="val" style="font-size:14px;">' + esc(p.msr_status||'—') + '</div><div class="lbl">MSR Status</div></div>' +
-    '<div class="profile-metric"><div class="val" style="font-size:14px;color:' + oppC.text + ';">' + p._opp + '</div><div class="lbl">Opposition</div></div>' +
+    '<div class="profile-metric"><div class="val" style="font-size:14px;">' + esc(p.msr_status||'—') + '</div><div class="lbl">MSR Decision</div></div>' +
+    '<div class="profile-metric"><div class="val" style="font-size:14px;color:' + oppC.text + ';">' + p._opp + '</div><div class="lbl">Interveners</div></div>' +
     '</div>';
 
   // Notes
