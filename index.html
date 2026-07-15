@@ -951,6 +951,19 @@ function toggleOpp(btn) {
   updateKeyIssues();
 }
 
+function filterByStatus(s) {
+  const sel = document.getElementById('statusFilter');
+  if (!sel) return;
+  sel.value = (sel.value === s) ? '' : s;
+  applyFilters();
+  updateKeyIssues();
+}
+function filterByOpp(opp) {
+  const btns = document.querySelectorAll('.opp-toggle');
+  const target = Array.from(btns).find(b => b.dataset.opp === opp);
+  if (target) toggleOpp(target);
+}
+
 function updateKeyIssues() {
   const activeOpps = Array.from(document.querySelectorAll('.opp-toggle.active')).map(b => b.dataset.opp);
   const section = document.getElementById('keyIssuesSection');
@@ -1123,12 +1136,15 @@ function techBadge(tech) {
 }
 function oppBadge(opp) {
   const c = OPP[opp] || OPP['Unknown'];
-  return '<span class="badge" style="background:' + c.bg + ';color:' + c.text + ';">' + opp + '</span>';
+  const escaped = (opp||'').replace(/'/g,"\\'");
+  return '<span class="badge" onclick="event.stopPropagation();filterByOpp(\'' + escaped + '\')" style="background:' + c.bg + ';color:' + c.text + ';cursor:pointer;" title="Filter by ' + esc(opp) + '">' + opp + '</span>';
 }
 function statusBadge(s) {
   const c = STATUS_C[s] || STATUS_C[''];
   const lbl = s ? s : 'Unknown';
-  return '<span class="badge" style="background:' + c.bg + ';color:' + c.text + ';">' + lbl + '</span>';
+  const clickAttr = s ? ' onclick="event.stopPropagation();filterByStatus(\'' + s.replace(/'/g,"\\'") + '\')" title="Filter by ' + esc(s) + '"' : '';
+  const cursor = s ? ';cursor:pointer' : '';
+  return '<span class="badge"' + clickAttr + ' style="background:' + c.bg + ';color:' + c.text + cursor + '">' + lbl + '</span>';
 }
 
 // ================================================================
