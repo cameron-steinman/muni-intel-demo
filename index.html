@@ -72,6 +72,30 @@ input.filter-input::placeholder { color:#475569; }
   /* Nav: allow wrapping */
   nav[style*="display:flex"] { flex-wrap: wrap; }
 }
+
+/* ── BCE-223: Bloomberg ticker strip ── */
+#bce-ticker-bar { background:#020617; border-bottom:1px solid #1e3a5f; flex-shrink:0; overflow:hidden; height:30px; display:flex; align-items:center; position:relative; }
+#bce-ticker-bar::before { content:'📡 LIVE'; position:absolute; left:0; top:0; bottom:0; background:#1d4ed8; color:#fff; font-size:10px; font-weight:800; letter-spacing:0.1em; padding:0 10px; display:flex; align-items:center; z-index:2; white-space:nowrap; }
+#bce-ticker-track-wrap { overflow:hidden; flex:1; margin-left:60px; position:relative; }
+#bce-ticker-track { display:flex; white-space:nowrap; animation:bce-ticker-scroll 90s linear infinite; will-change:transform; }
+#bce-ticker-track:hover { animation-play-state:paused; }
+@keyframes bce-ticker-scroll { 0% { transform:translateX(0); } 100% { transform:translateX(-50%); } }
+.bce-tick-item { display:inline-flex; align-items:center; gap:6px; padding:0 20px 0 0; font-size:11px; cursor:pointer; color:#94a3b8; border-right:1px solid #1e293b; margin-right:20px; height:30px; transition:color 0.15s; flex-shrink:0; }
+.bce-tick-item:hover { color:#e2e8f0; }
+.bce-tick-muni { color:#60a5fa; font-weight:700; }
+.bce-tick-dev  { color:#a3a3a3; }
+.bce-tick-mw   { color:#34d399; font-weight:700; font-size:10px; }
+.bce-tick-status-granted { color:#4ade80; font-size:9px; font-weight:800; background:#14532d; padding:1px 5px; border-radius:8px; }
+.bce-tick-status-pending { color:#fbbf24; font-size:9px; font-weight:800; background:#451a03; padding:1px 5px; border-radius:8px; }
+.bce-tick-status-denied  { color:#f87171; font-size:9px; font-weight:800; background:#450a0a; padding:1px 5px; border-radius:8px; }
+
+/* ── BCE-227: Quick filter pills ── */
+#quick-filter-bar { display:flex; flex-wrap:wrap; gap:8px; padding:12px 0 4px; align-items:center; }
+.qf-pill { display:inline-flex; align-items:center; gap:5px; padding:5px 14px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; border:1.5px solid #334155; background:#1e293b; color:#94a3b8; transition:all 0.15s; user-select:none; white-space:nowrap; }
+.qf-pill:hover { border-color:#64748b; color:#cbd5e1; }
+.qf-pill.active { background:#2563eb; border-color:#3b82f6; color:#fff; }
+.qf-pill .qf-count { font-size:11px; opacity:0.75; font-weight:500; }
+#quick-filter-bar .qf-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#475569; margin-right:2px; }
 </style>
 </head>
 <body>
@@ -95,6 +119,13 @@ input.filter-input::placeholder { color:#475569; }
     </nav>
   </div>
 </header>
+
+<!-- ── BCE-223: Bloomberg ticker strip ── -->
+<div id="bce-ticker-bar">
+  <div id="bce-ticker-track-wrap">
+    <div id="bce-ticker-track"><!-- populated by script --></div>
+  </div>
+</div>
 
 <!-- METRIC BAR -->
 <div style="background:#0f172a;flex-shrink:0;padding:10px 20px;border-bottom:1px solid #1e293b;">
@@ -199,6 +230,8 @@ input.filter-input::placeholder { color:#475569; }
     <div id="view-projects" style="flex:1;display:none;flex-direction:column;overflow:hidden;background:white;">
       <div style="padding:16px 20px 12px;border-bottom:1px solid #e2e8f0;flex-shrink:0;">
         <h2 style="font-size:16px;font-weight:700;color:#0f172a;margin:0;">Active Projects <span id="projectsCount" style="font-size:13px;font-weight:400;color:#64748b;"></span></h2>
+        <!-- ── BCE-227: Quick filter pills ── -->
+        <div id="quick-filter-bar"><span class="qf-label">Quick:</span></div>
       </div>
       <div style="overflow:auto;flex:1;">
         <table style="width:100%;border-collapse:collapse;">
@@ -1452,7 +1485,7 @@ function renderProjects() {
     '<td style="padding:9px 14px;font-size:15px;color:#475569;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (p.developer ? '<span onclick="event.stopPropagation();openDev(\'' + esc(p.developer).replace(/'/g,"\\'") + '\')" style="color:#2563eb;cursor:pointer;">' + esc(p.developer) + '</span>' : '—') + '</td>' +
     '<td style="padding:9px 14px;">' + techBadge(p._tech) + '</td>' +
     '<td style="padding:9px 14px;text-align:right;font-size:15px;font-weight:600;color:#0f172a;">' + (p._mw > 0 ? p._mw.toFixed(1) : '—') + '</td>' +
-    '<td style="padding:9px 14px;">' + statusBadge(p._status) + '</td>' +
+    '<td style="padding:9px 14px;">' + statusBadge(p._status) + ' ' + approvalOddsBadge(p) + '</td>' +
     '<td style="padding:9px 14px;">' + oppBadge(p._opp) + '</td>' +
     '</tr>'
   ).join('');
@@ -2041,6 +2074,7 @@ function openProject(id) {
     '<span onclick="openTech(\'' + esc(p._tech).replace(/'/g,"\\'") + '\')" style="background:' + tc + '30;color:' + (tc === '#eab308' ? '#ca8a04' : tc) + ';border:1px solid ' + tc + '50;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;cursor:pointer;">' + p._tech + '</span>' +
     (p._mw > 0 ? '<span style="background:#1d4ed8;color:#93c5fd;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;">' + p._mw.toFixed(1) + ' MW</span>' : '') +
     '<span style="background:' + sc.bg + ';color:' + sc.text + ';font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;">' + (p._status||'Unknown') + '</span>' +
+    approvalOddsBadge(p) +
     '<span style="background:' + oppC.bg + ';color:' + oppC.text + ';font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;">' + p._opp + ' Opp</span>' +
     '</div></div>';
 
@@ -3216,6 +3250,287 @@ document.addEventListener('DOMContentLoaded', () => {
   window.openMuni = function(name){ _om.call(this,name); var m=MUNI_MAP[name]; if(m){var pc=document.getElementById('profileContent');if(pc){pc._apiData=muniJson(m);pc._apiRoute='/municipalities/'+muniId(name);}} };
 
   console.log('%c MuniAPI ready ','background:#1e40af;color:white;font-weight:bold;border-radius:4px;padding:1px 4px;','— '+PROJECTS.length+' projects, '+Object.keys(DEV_MAP).length+' developers, '+Object.keys(MUNI_MAP).length+' municipalities. Try: await MuniAPI.get("/developers")');
+})();
+</script>
+
+<!-- ═══════ BCE-210+ FINAL HARVEST: ticker + approval-odds + season-record + quick-filter pills ═══════ -->
+<script>
+/* ── BCE-223: Bloomberg ticker strip ── */
+(function () {
+  function buildTicker() {
+    var track = document.getElementById('bce-ticker-track');
+    if (!track || typeof PROJECTS === 'undefined') return;
+    var pool = PROJECTS.filter(function(p){ return p._mw > 0 && p._status; })
+      .sort(function(a,b){ return b._mw - a._mw; }).slice(0, 60);
+    var items = '';
+    pool.forEach(function (p) {
+      var statusClass = 'bce-tick-status-pending';
+      var statusLabel = p._status || '—';
+      if (/grant|approv|operat/i.test(statusLabel) && !/not/i.test(statusLabel)) {
+        statusClass = 'bce-tick-status-granted'; statusLabel = '✓ ' + statusLabel;
+      } else if (/deni|reject|refus|cancel|withdraw/i.test(statusLabel)) {
+        statusClass = 'bce-tick-status-denied'; statusLabel = '✗ ' + statusLabel;
+      }
+      var name = (p.project_name || '').slice(0, 28) + ((p.project_name||'').length > 28 ? '…' : '');
+      items += '<span class="bce-tick-item" onclick="openProject(' + p.id + ')" title="' +
+        (p.project_name||'').replace(/"/g,'&quot;') + ' — ' + (p.municipality||'') + '">' +
+        '<span class="bce-tick-muni">' + (p.municipality || '—') + '</span>&nbsp;·&nbsp;' +
+        '<span class="bce-tick-dev">' + name + '</span>&nbsp;' +
+        '<span class="bce-tick-mw">⚡' + (p._mw > 0 ? p._mw.toFixed(0) + 'MW' : '—') + '</span>&nbsp;' +
+        '<span class="' + statusClass + '">' + statusLabel + '</span></span>';
+    });
+    track.innerHTML = items + items;
+    setTimeout(function () {
+      var trackW = track.scrollWidth / 2, speed = 80;
+      track.style.animationDuration = Math.max(30, Math.round(trackW / speed)) + 's';
+    }, 100);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(buildTicker, 150); });
+  } else { setTimeout(buildTicker, 150); }
+})();
+
+/* ── BCE-229: Approval Odds badge (rates built from PUBLIC PROJECTS, post-quarantine) ── */
+(function () {
+  function statusClass(s) {
+    var v = String(s || '').toLowerCase();
+    if (/grant|approv|operat|obtain|support|await.*grant|in development/.test(v)) {
+      if (/not\s+(grant|approv|obtain|support|selected|await)/.test(v)) return 'lost';
+      return 'won';
+    }
+    if (/deni|reject|refus|cancel|withdraw|terminat|defeat|fail|not selected|not awarded|unwilling|not deliverable|not obtained|not granted|not approved/.test(v)) return 'lost';
+    return 'pending';
+  }
+  function oppositionPenalty(o) {
+    var v = String(o || '').toLowerCase();
+    if (/extreme|very high|^high|\(high|strong|rejected|unwilling|petition|death threat/.test(v)) return 0.30;
+    if (/medium|moderate|some|present|concern/.test(v)) return 0.12;
+    if (/low|none|no info|not report|no explicit|not specified|unknown|standard/.test(v)) return 0.0;
+    return 0.05;
+  }
+  function pubRows() { try { return PROJECTS; } catch (e) { return (window.PROJECTS || []); } }
+  var muniRate = {}, devRate = {}, BASE = null, built = false;
+  function buildRates() {
+    var mAgg = {}, dAgg = {};
+    pubRows().forEach(function (r) {
+      var cls = statusClass(r.msr_status);
+      if (cls === 'pending') return;
+      var won = cls === 'won' ? 1 : 0;
+      var m = r.municipality || '—', d = r.developer || '—';
+      (mAgg[m] = mAgg[m] || { w:0, n:0 }); mAgg[m].w += won; mAgg[m].n += 1;
+      (dAgg[d] = dAgg[d] || { w:0, n:0 }); dAgg[d].w += won; dAgg[d].n += 1;
+    });
+    Object.keys(mAgg).forEach(function (k) { muniRate[k] = mAgg[k].n ? mAgg[k].w / mAgg[k].n : null; });
+    Object.keys(dAgg).forEach(function (k) { devRate[k] = dAgg[k].w / dAgg[k].n; });
+  }
+  function globalBase() {
+    var w = 0, n = 0;
+    pubRows().forEach(function (r) {
+      var cls = statusClass(r.msr_status);
+      if (cls === 'pending') return;
+      n++; if (cls === 'won') w++;
+    });
+    return n ? w / n : 0.6;
+  }
+  window.approvalOdds = function (row) {
+    if (!built) { BASE = globalBase(); buildRates(); built = true; }
+    var cls = statusClass(row.msr_status);
+    if (cls === 'won') return { pct: 100, label: 'Granted', tone: 'won' };
+    if (cls === 'lost') return { pct: 0, label: 'Denied', tone: 'lost' };
+    var m = muniRate[row.municipality], d = devRate[row.developer];
+    var parts = [], weights = [];
+    if (m != null) { parts.push(m); weights.push(0.45); }
+    if (d != null) { parts.push(d); weights.push(0.35); }
+    parts.push(BASE); weights.push(0.20);
+    var num = 0, den = 0;
+    for (var i = 0; i < parts.length; i++) { num += parts[i] * weights[i]; den += weights[i]; }
+    var score = (den ? num / den : BASE) - oppositionPenalty(row.opposition_level);
+    var pct = Math.max(3, Math.min(97, Math.round(score * 100)));
+    return { pct: pct, label: 'Odds ' + pct + '%', tone: pct >= 60 ? 'good' : pct >= 35 ? 'mid' : 'low' };
+  };
+  window.approvalOddsBadge = function (row) {
+    var o = window.approvalOdds(row);
+    var color = { won:'#1a7f37', lost:'#b91c1c', good:'#1a7f37', mid:'#b45309', low:'#b91c1c' }[o.tone] || '#555';
+    return '<span class="odds-badge" title="Predicted approval odds — weighted from municipality + developer history (public rows only), minus opposition load" ' +
+      'style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:11px;font-weight:600;color:#fff;background:' +
+      color + ';white-space:nowrap;">' + o.label + '</span>';
+  };
+})();
+
+/* ── BCE-222/234: Developer Season Record W-L-P (corrected — bare DEV_MAP) ── */
+(function () {
+  function getDevMap() { try { return DEV_MAP; } catch (e) { return window.DEV_MAP || {}; } }
+  function wonStatus(s) {
+    var v = String(s || '').toLowerCase();
+    if (/not\s+(grant|approv|obtain)/.test(v)) return false;
+    return /grant|approv|operat|obtained|supported/.test(v);
+  }
+  function lostStatus(s) {
+    var v = String(s || '').toLowerCase();
+    return /deni|reject|refus|cancel|withdraw|terminat|defeat|fail|not selected|not awarded|unwilling|not deliverable|not obtained|not granted|not approved/.test(v);
+  }
+  function computeStreak(projects) {
+    var streak = 0, dir = null;
+    for (var i = projects.length - 1; i >= 0; i--) {
+      var s = projects[i].msr_status;
+      var curDir = wonStatus(s) ? 'W' : lostStatus(s) ? 'L' : null;
+      if (!curDir) break;
+      if (dir === null) { dir = curDir; streak = 1; }
+      else if (curDir === dir) { streak++; } else break;
+    }
+    return dir && streak >= 2 ? streak + dir : null;
+  }
+  function augmentDevMap() {
+    Object.values(getDevMap()).forEach(function (d) {
+      if (d._wlpDone) return;
+      var w = 0, l = 0, p = 0;
+      (d.projects || []).forEach(function (proj) {
+        if (wonStatus(proj.msr_status)) w++;
+        else if (lostStatus(proj.msr_status)) l++;
+        else p++;
+      });
+      d._w = w; d._l = l; d._p = p;
+      d._avg = (w + l) > 0 ? (w / (w + l)) : null;
+      d._streak = computeStreak(d.projects);
+      d._wlpDone = true;
+    });
+  }
+  function avgLabel(avg) {
+    if (avg === null) return '—';
+    if (avg >= 1) return '1.000';
+    if (avg <= 0) return '.000';
+    return '.' + ('000' + Math.round(avg * 1000)).slice(-3);
+  }
+  function streakHTML(streak) {
+    if (!streak) return '';
+    var isW = streak.endsWith('W');
+    var col = isW ? '#4ade80' : '#f87171', bg = isW ? '#14532d' : '#450a0a';
+    return '<span style="font-size:10px;font-weight:800;background:' + bg + ';color:' + col +
+      ';padding:1px 5px;border-radius:8px;margin-left:4px;">' + streak + '</span>';
+  }
+  function wlpHTML(d) {
+    var wColor = '#16a34a', lColor = '#dc2626', pColor = '#d97706';
+    var avgColor = d._avg !== null ? (d._avg >= 0.7 ? '#16a34a' : d._avg >= 0.4 ? '#d97706' : '#dc2626') : '#94a3b8';
+    return '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9;flex-wrap:wrap;">' +
+      '<span style="font-size:10px;font-weight:800;color:#94a3b8;letter-spacing:0.06em;text-transform:uppercase;">Record</span>' +
+      '<span style="font-size:12px;font-weight:700;color:' + wColor + ';">' + d._w + 'W</span>' +
+      '<span style="font-size:12px;font-weight:700;color:' + lColor + ';">' + d._l + 'L</span>' +
+      '<span style="font-size:12px;font-weight:700;color:' + pColor + ';">' + d._p + 'P</span>' +
+      '<span style="font-size:11px;color:#64748b;">·</span>' +
+      '<span style="font-size:12px;font-weight:700;color:' + avgColor + ';" title="Approval rate over decided files">' + avgLabel(d._avg) + '</span>' +
+      streakHTML(d._streak) + '</div>';
+  }
+  function patchRenderDevs() {
+    if (typeof window.renderDevs !== 'function') return;
+    if (window.renderDevs._wlpPatched) return;
+    var _orig = window.renderDevs;
+    window.renderDevs = function () {
+      augmentDevMap();
+      _orig.apply(this, arguments);
+      var grid = document.getElementById('devsGrid');
+      if (!grid) return;
+      var map = getDevMap();
+      grid.querySelectorAll('[onclick]').forEach(function (card) {
+        if (card.querySelector('.wlp-box')) return;
+        var attr = card.getAttribute('onclick') || '';
+        var m = attr.match(/openDev\('(.+?)'\)/);
+        if (!m) return;
+        var name = m[1].replace(/\\'/g, "'");
+        var d = map[name];
+        if (!d) return;
+        var box = document.createElement('div');
+        box.className = 'wlp-box';
+        box.innerHTML = wlpHTML(d);
+        card.appendChild(box);
+      });
+    };
+    window.renderDevs._wlpPatched = true;
+  }
+  function init() {
+    augmentDevMap();
+    patchRenderDevs();
+    if (typeof window.renderDevs === 'function' && document.getElementById('devsGrid') &&
+        document.getElementById('devsGrid').children.length > 0) { window.renderDevs(); }
+  }
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); }
+  else { setTimeout(init, 200); }
+})();
+
+/* ── BCE-227: Quick Filter Pills (CORRECTED — exact status values + bare PROJECTS + exact opp match) ── */
+(function () {
+  var PRESETS = [
+    { id:'all',     label:'All',              icon:'⬛', apply:function(){ clearAllFilters(); } },
+    { id:'granted', label:'Granted',          icon:'✅', apply:function(){ clearAllFilters(); setStatus('Granted'); } },
+    { id:'pending', label:'Pending',          icon:'⏳', apply:function(){ clearAllFilters(); setStatus('Proposed/Pending'); } },
+    { id:'denied',  label:'Denied / Rejected',icon:'🚫', apply:function(){ clearAllFilters(); setStatus('Withdrawn/Denied'); } },
+    { id:'high-mw', label:'≥ 100 MW',         icon:'⚡', apply:function(){ clearAllFilters(); setMWMin(100); } },
+    { id:'opposed', label:'High Opposition',  icon:'⚠️', apply:function(){ clearAllFilters(); setOpp('High'); } },
+    { id:'bess',    label:'BESS Only',        icon:'🔋', apply:function(){ clearAllFilters(); setTech('BESS'); } },
+    { id:'wind',    label:'Wind Only',        icon:'🌬️', apply:function(){ clearAllFilters(); setTech('Wind'); } }
+  ];
+  var activeId = 'all';
+  function clearAllFilters() {
+    var si = document.getElementById('searchInput'); if (si) si.value = '';
+    var sf = document.getElementById('statusFilter'); if (sf) sf.value = '';
+    var mn = document.getElementById('minMW'), mx = document.getElementById('maxMW');
+    if (mn) mn.value = ''; if (mx) mx.value = '';
+    document.querySelectorAll('.opp-toggle.active').forEach(function (b) { b.classList.remove('active'); });
+    document.querySelectorAll('#techFilters input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+  }
+  function setStatus(val) { var sf = document.getElementById('statusFilter'); if (sf) sf.value = val; }
+  function setMWMin(n) { var mn = document.getElementById('minMW'); if (mn) mn.value = n; }
+  function setOpp(level) {
+    document.querySelectorAll('.opp-toggle').forEach(function (b) {
+      if (b.dataset.opp === level) b.classList.add('active');
+    });
+  }
+  function setTech(name) {
+    document.querySelectorAll('#techFilters input[type=checkbox]').forEach(function (cb) {
+      if (cb.value === name) cb.checked = true;
+    });
+  }
+  function pub() { try { return PROJECTS; } catch (e) { return (window.PROJECTS || []); } }
+  function countFor(id) {
+    var rows = pub();
+    if (!rows || !rows.length) return '';
+    try {
+      if (id === 'all') return rows.length;
+      if (id === 'granted') return rows.filter(function(p){ return p._status === 'Granted'; }).length;
+      if (id === 'pending') return rows.filter(function(p){ return p._status === 'Proposed/Pending'; }).length;
+      if (id === 'denied')  return rows.filter(function(p){ return p._status === 'Withdrawn/Denied'; }).length;
+      if (id === 'high-mw') return rows.filter(function(p){ return p._mw >= 100; }).length;
+      if (id === 'opposed') return rows.filter(function(p){ return p._opp === 'High'; }).length;
+      if (id === 'bess')    return rows.filter(function(p){ return p._tech === 'BESS'; }).length;
+      if (id === 'wind')    return rows.filter(function(p){ return p._tech === 'Wind'; }).length;
+      return '';
+    } catch (e) { return ''; }
+  }
+  function renderPills() {
+    var bar = document.getElementById('quick-filter-bar');
+    if (!bar) return;
+    bar.innerHTML = '<span class="qf-label">Quick:</span>';
+    PRESETS.forEach(function (preset) {
+      var btn = document.createElement('span');
+      btn.className = 'qf-pill' + (preset.id === activeId ? ' active' : '');
+      var cnt = countFor(preset.id);
+      btn.innerHTML = preset.icon + ' ' + preset.label + (cnt !== '' ? ' <span class="qf-count">(' + cnt + ')</span>' : '');
+      btn.addEventListener('click', function () {
+        activeId = preset.id; preset.apply();
+        if (typeof applyFilters === 'function') applyFilters();
+        renderPills();
+      });
+      bar.appendChild(btn);
+    });
+  }
+  function initQuickFilters() {
+    renderPills();
+    ['searchInput', 'statusFilter', 'minMW', 'maxMW'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('input', function () { activeId = 'all'; renderPills(); });
+    });
+  }
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initQuickFilters); }
+  else { setTimeout(initQuickFilters, 120); }
 })();
 </script>
 
